@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="hr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D Models Lab</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+</head>
+<body>
+<main class="app">
+<header><div class="cube">3D</div><div><h1>3D Models Lab</h1><p>Od fotografije prema 3D modelu</p></div></header>
+<section class="card">
+<h2>1. Učitaj fotografiju</h2>
+<label class="drop" id="drop"><input id="imageInput" type="file" accept="image/*"><span>📷</span><strong>Odaberi sliku predmeta</strong><small>JPG, PNG ili WEBP</small></label>
+<div id="previewWrap" class="preview hidden"><img id="preview" alt="Pregled učitane slike"><button id="removeImage">Ukloni sliku</button></div>
+</section>
+<section class="card">
+<h2>2. Pipeline</h2>
+<div class="steps"><div class="step active">Slika</div><b>›</b><div class="step">Izdvajanje</div><b>›</b><div class="step">Više kutova</div><b>›</b><div class="step">3D</div><b>›</b><div class="step">GLB</div></div>
+<p class="note">Ova prva verzija priprema web sučelje i 3D prikaz. AI generiranje više pogleda i rekonstrukcija bit će zaseban modul jer GitHub Pages nema GPU poslužitelj.</p>
+<button class="primary" id="start" disabled>Pokreni pripremu</button>
+<div id="status" class="status hidden"></div>
+</section>
+<section class="card">
+<h2>3. 3D preglednik</h2>
+<div class="viewerEmpty" id="viewerEmpty">🧊<br><span>Ovdje će se pojaviti 3D model</span></div>
+<model-viewer id="viewer" class="hidden" camera-controls auto-rotate shadow-intensity="1" exposure="1" ar></model-viewer>
+<label class="modelUpload">Testiraj postojeći GLB/GLTF<input id="modelInput" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json"></label>
+</section>
+<footer>3D Models Lab • prototip bez plaćenog API-ja</footer>
+</main><script src="app.js"></script>
+</body></html>
