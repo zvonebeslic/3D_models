@@ -1,0 +1,19 @@
+/* FullVector: converts every confirmed logo region to real SVG paths. No embedded raster image. */
+function FV(mask,img,W,H){
+ const P=img.data,N=W*H,K=48,samples=[]; let stride=Math.max(1,Math.floor(Math.sqrt(N/18000)));
+ for(let y=0;y<H;y+=stride)for(let x=0;x<W;x+=stride){let n=y*W+x;if(mask[n]){let i=n*4;samples.push([P[i],P[i+1],P[i+2]])}}
+ if(!samples.length)throw Error('Prazna maska');
+ let centers=[];for(let k=0;k<K;k++){let s=samples[Math.floor(k*(samples.length-1)/Math.max(1,K-1))];centers.push(s.slice())}
+ // farthest-point palette seed gives broad color coverage
+ centers=[samples[Math.floor(samples.length/2)].slice()];while(centers.length<K){let best=samples[0],bd=-1;for(let z=0;z<samples.length;z+=Math.max(1,Math.floor(samples.length/2500))){let s=samples[z],d=1e9;for(let c of centers){let q=(s[0]-c[0])**2+(s[1]-c[1])**2+(s[2]-c[2])**2;if(q<d)d=q}if(d>bd){bd=d;best=s}}centers.push(best.slice())}
+ for(let it=0;it<5;it++){let sum=Array.from({length:K},()=>[0,0,0,0]);for(let s of samples){let bi=0,bd=1e20;for(let k=0;k<K;k++){let c=centers[k],d=(s[0]-c[0])**2+(s[1]-c[1])**2+(s[2]-c[2])**2;if(d<bd){bd=d;bi=k}}let a=sum[bi];a[0]+=s[0];a[1]+=s[1];a[2]+=s[2];a[3]++}for(let k=0;k<K;k++)if(sum[k][3])centers[k]=sum[k].slice(0,3).map(v=>v/sum[k][3])}
+ let labels=new Uint8Array(N);labels.fill(255);for(let n=0;n<N;n++)if(mask[n]){let i=n*4,bi=0,bd=1e20;for(let k=0;k<K;k++){let c=centers[k],d=(P[i]-c[0])**2+(P[i+1]-c[1])**2+(P[i+2]-c[2])**2;if(d<bd){bd=d;bi=k}}labels[n]=bi}
+ const key=p=>p[0]+','+p[1];
+ function trace(k){let ss=[];const V=(x,y)=>x<0||y<0||x>=W||y>=H?0:(labels[y*W+x]===k?1:0);for(let y=0;y<H-1;y++)for(let x=0;x<W-1;x++){let a=V(x,y),b=V(x+1,y),c=V(x+1,y+1),d=V(x,y+1),q=(a?8:0)|(b?4:0)|(c?2:0)|(d?1:0);if(!q||q===15)continue;let T=[x+.5,y],R=[x+1,y+.5],B=[x+.5,y+1],L=[x,y+.5],A=(u,v)=>ss.push([u,v]);switch(q){case 1:A(L,B);break;case 2:A(B,R);break;case 3:A(L,R);break;case 4:A(T,R);break;case 5:A(T,L);A(B,R);break;case 6:A(T,B);break;case 7:A(T,L);break;case 8:A(L,T);break;case 9:A(B,T);break;case 10:A(L,B);A(T,R);break;case 11:A(R,T);break;case 12:A(R,L);break;case 13:A(R,B);break;case 14:A(B,L)}}let map=new Map;ss.forEach((s,i)=>s.forEach(p=>{let q=key(p);if(!map.has(q))map.set(q,[]);map.get(q).push(i)}));let used=new Uint8Array(ss.length),out=[];for(let i=0;i<ss.length;i++){if(used[i])continue;used[i]=1;let ch=[ss[i][0],ss[i][1]],cur=ss[i][1];for(let z=0;z<ss.length;z++){let j=(map.get(key(cur))||[]).find(v=>!used[v]);if(j==null)break;used[j]=1;let s=ss[j];cur=key(s[0])===key(cur)?s[1]:s[0];ch.push(cur);if(key(cur)===key(ch[0]))break}if(ch.length>=4)out.push(ch)}return out}
+ function area(P){let a=0;for(let i=0,j=P.length-1;i<P.length;j=i++)a+=P[j][0]*P[i][1]-P[i][0]*P[j][1];return a/2}
+ function smooth(P){if(P.length<9)return P;let q=P;for(let z=0;z<2;z++){let r=[];for(let i=0;i<q.length;i++){let a=q[(i-1+q.length)%q.length],b=q[i],c=q[(i+1)%q.length];r.push([(a[0]+10*b[0]+c[0])/12,(a[1]+10*b[1]+c[1])/12])}q=r}return q}
+ function dpath(P){P=smooth(P);let d=`M${P[0][0].toFixed(2)} ${P[0][1].toFixed(2)}`;for(let i=1;i<P.length;i++)d+=`L${P[i][0].toFixed(2)} ${P[i][1].toFixed(2)}`;return d+'Z'}
+ let body='',paths=0,pts=0;for(let k=0;k<K;k++){let cs=trace(k).filter(c=>Math.abs(area(c))>=.65);if(!cs.length)continue;let d='';for(let c of cs){d+=dpath(c);paths++;pts+=c.length}let c=centers[k].map(v=>Math.max(0,Math.min(255,Math.round(v)))),hex='#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');body+=`<path d="${d}" fill="${hex}" fill-rule="evenodd"/>`}
+ return{svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" shape-rendering="geometricPrecision">${body}</svg>`,colors:K,paths,points:pts};
+}
+window.FullVector=FV;
