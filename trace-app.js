@@ -4,7 +4,7 @@
 var $ = function (id) { return document.getElementById(id); };
 var els = {};
 ["fileInput","dropZone","fileDetails","fileName","replaceImage","manualTab","autoTab",
- "manualControls","autoControls","snapEdges","undoBtn","redoBtn","closeBtn","deleteBtn","clearBtn",
+ "manualControls","autoControls","snapEdges","nativePixels","undoBtn","redoBtn","closeBtn","deleteBtn","clearBtn",
  "manualTolerance","manualToleranceValue","manualSmooth","manualSmoothValue",
  "backgroundTolerance","backgroundToleranceValue","alphaThreshold","alphaThresholdValue",
  "autoTolerance","autoToleranceValue","autoSmooth","autoSmoothValue","includeHoles",
@@ -97,6 +97,7 @@ window.addEventListener("resize", fitCanvas);
 
 function loadFile(file) {
   if (!file) return;
+  state.originalFile = file;
   if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
     tell("Učitaj PNG, JPG ili WEBP sliku.", "error"); return;
   }
@@ -113,8 +114,14 @@ function loadFile(file) {
     try {
       var iw = img.naturalWidth, ih = img.naturalHeight;
       if (!iw || !ih) throw Error("Neispravne dimenzije slike.");
-      // Conserve device memory. Dimension reduction is explicit in the status.
-      var factor = Math.min(1, 2500 / Math.max(iw, ih), Math.sqrt(5000000 / (iw * ih)));
+      // Keep original raster 1:1 by default. Never silently resample.
+      var full = els.nativePixels.checked;
+      var limit = /Android|iPhone|iPad/i.test(navigator.userAgent) ? 12000000 : 20000000;
+      if (full && iw * ih > limit) {
+        throw new Error("Slika ima " + (iw * ih / 1000000).toFixed(1) + " MP. Obrada 1:1 na ovom uređaju ograničena je na " +
+          (limit / 1000000) + " MP radi memorije. Isključi ULTRA 1:1 i učitaj ponovno ili obradi manji izvorni PNG.");
+      }
+      var factor = full ? 1 : Math.min(1, 2500 / Math.max(iw, ih), Math.sqrt(5000000 / (iw * ih)));
       var w = Math.max(1, Math.round(iw * factor)), h = Math.max(1, Math.round(ih * factor));
       var c = document.createElement("canvas"); c.width = w; c.height = h;
       var ctx = c.getContext("2d", { willReadFrequently: true });
@@ -140,7 +147,7 @@ function loadFile(file) {
       els.zoomLabel.textContent = "100%";
       fitCanvas();
       setButtons();
-      tell("✓ Logo učitan. " + (factor < 1 ? "Velika slika smanjena je za obradu; original nije promijenjen. " : "") +
+      tell("✓ Logo učitan. " + (factor < 1 ? "Slika je smanjena za obradu jer ULTRA 1:1 nije uključen. " : "Izvorni pikseli 1:1 bez smanjivanja. ") +
         "Odaberi način praćenja.", "ok");
     } catch (error) {
       URL.revokeObjectURL(nextUrl);
@@ -150,6 +157,9 @@ function loadFile(file) {
   img.src = nextUrl;
 }
 els.fileInput.addEventListener("change", function (e) { loadFile(e.target.files[0]); });
+els.nativePixels.addEventListener("change", function () {
+  if (state.originalFile) loadFile(state.originalFile);
+});
 els.replaceImage.addEventListener("click", function () { els.fileInput.click(); });
 ["dragenter","dragover"].forEach(function (event) {
   els.dropZone.addEventListener(event, function (e) { e.preventDefault(); els.dropZone.classList.add("dragover"); });
@@ -213,7 +223,7 @@ function render() {
   var col = els.pathColor.value;
   var smooth = Number((state.mode === "manual" ? els.manualSmooth : els.autoSmooth).value);
   var scale = els.artboard.clientWidth / state.width || 1;
-  var displayStroke = Math.min(8, Math.max(1, 2.1 / scale));
+  var displayStroke = Math.min(5, Math.max(.2, 1.2 / scale));
   var isFilled = els.exportStyle.value === "filled";
   if (state.mode === "auto" && paths.length && isFilled) {
     // A single even-odd shape keeps holes genuinely hollow.
