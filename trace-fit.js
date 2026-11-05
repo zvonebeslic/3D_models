@@ -86,37 +86,36 @@ function fitArc(points,tolerance,out){
   }
 }
 function ringAnchors(points){
-  var n=points.length,smallTol=.72,keepers=[];
-  // RDP is only for locating corners, not for throwing away source contour vertices.
-  var poly=root.TraceCore&&root.TraceCore.simplify?root.TraceCore.simplify(points,smallTol,true):points;
-  var indexes=new Map();for(var i=0;i<n;i++)indexes.set(points[i],i);
-  for(var k=0;k<poly.length;k++){
-    var a=poly[(k-1+poly.length)%poly.length],p=poly[k],b=poly[(k+1)%poly.length];
-    var da=Math.sqrt(sq(a,p)),db=Math.sqrt(sq(b,p));
-    if(da<2.8||db<2.8)continue;
-    var u=norm(minus(a,p)),v=norm(minus(b,p));
-    var turn=Math.PI-Math.acos(cap(dot(u,v),-1,1));
-    if(turn>1.05)keepers.push({index:indexes.get(p),turn:turn});
+  var n=points.length,step=cap(Math.round(n/400),4,8), candidates=[];
+  // Measure direction across several source pixels: a stair-step is not
+  // mistaken for a logo corner; a true 90° bend is retained.
+  for(var i=0;i<n;i++){
+    var a=points[(i-step+n)%n],p=points[i],b=points[(i+step)%n];
+    if(sq(a,p)<2||sq(b,p)<2)continue;
+    var vin=norm(minus(p,a)),vout=norm(minus(b,p));
+    var turn=Math.acos(cap(dot(vin,vout),-1,1));
+    if(turn>.87)candidates.push({index:i,turn:turn});
   }
-  keepers.sort(function(a,b){return b.turn-a.turn;});
-  var selected=[];
-  for(var item of keepers){
-    if(selected.length>=50)break;
+  candidates.sort(function(a,b){return b.turn-a.turn;});
+  var selected=[],spacing=Math.max(5,step*2);
+  for(var item of candidates){
+    if(selected.length>=64)break;
     var idx=item.index;
-    if(selected.every(function(j){return Math.min((idx-j+n)%n,(j-idx+n)%n)>=4;}))
+    if(selected.every(function(j){return Math.min((idx-j+n)%n,(j-idx+n)%n)>=spacing;}))
       selected.push(idx);
   }
   if(selected.length<2){
+    var first=0;
+    for(var t=1;t<n;t++)if(points[t].x<points[first].x)first=t;
     selected=[];
-    var first=0;for(var t=1;t<n;t++)if(points[t].x<points[first].x)first=t;
-    selected=[first,(first+Math.floor(n/2))%n];
+    for(var q=0;q<4;q++)selected.push((first+Math.floor(q*n/4))%n);
   }
   selected.sort(function(a,b){return a-b;});
   var all=[];
   for(var z=0;z<selected.length;z++){
-    var start=selected[z],end=selected[(z+1)%selected.length],count=(end-start+n)%n;
-    var countChunks=Math.max(1,Math.ceil(count/160));
-    for(var u=0;u<countChunks;u++)all.push((start+Math.round(u*count/countChunks))%n);
+    var begin=selected[z],end=selected[(z+1)%selected.length];
+    var count=(end-begin+n)%n, chunks=Math.max(1,Math.ceil(count/160));
+    for(var u=0;u<chunks;u++)all.push((begin+Math.round(u*count/chunks))%n);
   }
   return Array.from(new Set(all)).sort(function(a,b){return a-b;});
 }
