@@ -273,7 +273,7 @@
     if(opts.includeColorEdges) {
       var edges=traceColorBoundaries(image,w,h,src.values,Math.max(1,Number(opts.edgeTolerance)||40));
       detailCount=edges.length;
-      output.push.apply(output,edges);
+      for(var detail of edges)output.push(detail);
     }
     return {paths:output,note:src.note,source:src.type,contoursFound:rings.length,detailCount:detailCount};
   }
