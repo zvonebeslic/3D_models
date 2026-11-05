@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b1020">
   <title>Logo Trace Studio | Logo Print Lab</title>
-  <link rel="stylesheet" href="trace.css">
+  <link rel="stylesheet" href="trace.css?v=ultra2">
 </head>
 <body>
 <main class="shell">
@@ -73,6 +73,10 @@
       </div>
       <div class="toolbar">
         <label class="check"><input id="includeHoles" type="checkbox" checked> Uključi unutarnje otvore</label>
+        <label class="check"><input id="includeColorEdges" type="checkbox"> Prati i unutarnje granice različitih boja</label>
+        <label class="control edgecontrol">Prag unutarnjih granica <output id="edgeToleranceValue">40</output>
+          <input id="edgeTolerance" type="range" min="1" max="180" value="40" step="1">
+        </label>
         <button type="button" id="traceBtn" class="strong" disabled>◎ ULTRA · Pronađi sve konture</button>
       </div>
       <small class="hint">Preciznost SVG koordinata: šest decimalnih mjesta (0,000001 px u zapisu). Stvarna točnost ovisi o kvaliteti izvora. Ako previše šuma ulazi u obris, povećaj prag pozadine.</small>
@@ -117,7 +121,7 @@
   </section>
   <footer>Logo Trace Studio · ULTRA DETAIL · vlastiti algoritam bez vanjskog servisa</footer>
 </main>
-<script src="trace-core.js"></script>
-<script src="trace-app.js"></script>
+<script src="trace-core.js?v=ultra2"></script>
+<script src="trace-app.js?v=ultra2"></script>
 </body>
 </html>
