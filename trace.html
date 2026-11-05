@@ -22,6 +22,8 @@
       <strong>＋ Učitaj logo</strong>
       <span>Dodirni za odabir ili ovdje povuci datoteku</span>
     </label>
+    <label class="check detailtoggle"><input id="nativePixels" type="checkbox" checked> ULTRA 1:1 · svi izvorni pikseli, bez smanjivanja</label>
+    <small class="hint">Pri vrlo velikim slikama uređaj može ostati bez memorije. Ako obrada ne uspije, isključi 1:1 i ponovno učitaj.</small>
     <div class="filedetails" id="fileDetails" hidden><span id="fileName"></span><button id="replaceImage" type="button">Promijeni sliku</button></div>
   </section>
 
@@ -42,11 +44,11 @@
         <button type="button" id="clearBtn" disabled>Očisti sve</button>
       </div>
       <div class="settingrow">
-        <label class="control">Preciznost pojednostavljenja <output id="manualToleranceValue">0,8 px</output>
-          <input id="manualTolerance" type="range" min="0" max="30" value="8" step="1">
+        <label class="control">Preciznost pojednostavljenja <output id="manualToleranceValue">0 px</output>
+          <input id="manualTolerance" type="range" min="0" max="30" value="0" step="1">
         </label>
-        <label class="control">Zaglađivanje <output id="manualSmoothValue">30%</output>
-          <input id="manualSmooth" type="range" min="0" max="100" value="30" step="5">
+        <label class="control">Zaglađivanje <output id="manualSmoothValue">0%</output>
+          <input id="manualSmooth" type="range" min="0" max="100" value="0" step="5">
         </label>
       </div>
       <label class="check"><input id="snapEdges" type="checkbox"> Magnet uz rub logotipa (neobavezno)</label>
@@ -54,34 +56,34 @@
     </div>
 
     <div class="modecontrols" id="autoControls" hidden>
-      <p>Vlastiti algoritam čita alfa-kanal ili uklanja pozadinu povezanu s rubovima, zatim pronalazi subpikselne konture.</p>
+      <p>ULTRA DETAIL: prati rubove svih dostupnih piksela i unutarnje otvore, bez automatskog pojednostavljenja ili zaglađivanja. Prozirni PNG daje najvjernije rezultate; obični JPG zahtijeva procjenu pozadine.</p>
       <div class="settingrow">
-        <label class="control">Sličnost pozadini <output id="backgroundToleranceValue">42</output>
-          <input id="backgroundTolerance" type="range" min="10" max="120" value="42" step="2">
+        <label class="control">Sličnost pozadini <output id="backgroundToleranceValue">18</output>
+          <input id="backgroundTolerance" type="range" min="1" max="120" value="18" step="2">
         </label>
         <label class="control">Prag prozirnosti <output id="alphaThresholdValue">50%</output>
           <input id="alphaThreshold" type="range" min="1" max="99" value="50" step="1">
         </label>
-        <label class="control">Preciznost konture <output id="autoToleranceValue">0,8 px</output>
-          <input id="autoTolerance" type="range" min="0" max="30" value="8" step="1">
+        <label class="control">Preciznost konture <output id="autoToleranceValue">0 px</output>
+          <input id="autoTolerance" type="range" min="0" max="30" value="0" step="1">
         </label>
-        <label class="control">Zaglađivanje <output id="autoSmoothValue">20%</output>
-          <input id="autoSmooth" type="range" min="0" max="100" value="20" step="5">
+        <label class="control">Zaglađivanje <output id="autoSmoothValue">0%</output>
+          <input id="autoSmooth" type="range" min="0" max="100" value="0" step="5">
         </label>
       </div>
       <div class="toolbar">
-        <label class="check"><input id="includeHoles" type="checkbox"> Uključi unutarnje otvore</label>
-        <button type="button" id="traceBtn" class="strong" disabled>◎ Pronađi vanjske konture</button>
+        <label class="check"><input id="includeHoles" type="checkbox" checked> Uključi unutarnje otvore</label>
+        <button type="button" id="traceBtn" class="strong" disabled>◎ ULTRA · Pronađi sve konture</button>
       </div>
-      <small class="hint">Za najbolju preciznost koristi prozirni PNG. Na JPG-u je najbolje imati jednoličnu pozadinu.</small>
+      <small class="hint">Preciznost SVG koordinata: šest decimalnih mjesta (0,000001 px u zapisu). Stvarna točnost ovisi o kvaliteti izvora. Ako previše šuma ulazi u obris, povećaj prag pozadine.</small>
     </div>
 
     <div class="viewtools">
       <label class="check"><input type="checkbox" id="showOriginal" checked> Prikaži original</label>
       <button type="button" id="pickColor" disabled>◉ Uzmi boju iz loga</button>
       <button type="button" id="panBtn" disabled aria-pressed="false">✥ Pomakni prikaz</button>
-      <label class="colorcontrol">Boja vektora <input type="color" id="pathColor" value="#28d6c6"></label>
-      <label class="zoomcontrol">Zum <span id="zoomLabel">100%</span><input id="zoomSlider" type="range" min="25" max="500" value="100" step="25"></label>
+      <label class="colorcontrol">Boja vektora <input type="color" id="pathColor" value="#ff00aa"></label>
+      <label class="zoomcontrol">Zum <span id="zoomLabel">100%</span><input id="zoomSlider" type="range" min="25" max="3200" value="100" step="25"></label>
     </div>
 
     <div class="viewport" id="viewport">
@@ -102,7 +104,7 @@
       <label>Vrsta SVG-a
         <select id="exportStyle"><option value="outline">Čiste linije / konture</option><option value="filled">Ispunjeni oblici</option></select>
       </label>
-      <label>Debljina linije <input id="strokeWidth" type="number" min="0.1" max="30" value="2" step="0.5"></label>
+      <label>Debljina linije <input id="strokeWidth" type="number" min="0.1" max="30" value="0.5" step="0.5"></label>
     </div>
     <div class="toolbar">
       <button type="button" id="previewBtn" disabled>◐ Pregled samo vektora</button>
@@ -113,7 +115,7 @@
     <p class="note" id="exportHelp">Za preuzimanje prvo nacrtaj putanju ili u automatskom načinu klikni „Pronađi vanjske konture”. Na mobitelu možeš koristiti i „Spremi / podijeli”.</p>
     <p class="note">SVG sadrži stvarne vektorske putanje, bez ugrađene rasterske slike. Za višebojnu vektorizaciju cijelog loga koristi <a href="index.html">Full Vector</a>. Kontura i silueta prikazuju jednu odabranu boju.</p>
   </section>
-  <footer>Logo Trace Studio · vlastiti algoritam, bez slanja fotografija na server</footer>
+  <footer>Logo Trace Studio · ULTRA DETAIL · vlastiti algoritam bez vanjskog servisa</footer>
 </main>
 <script src="trace-core.js"></script>
 <script src="trace-app.js"></script>
