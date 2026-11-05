@@ -8,7 +8,7 @@ Repozitorij s postojećim **Full Vector** alatom i zasebnim **Logo Trace Studio*
 
 ### ULTRA DETAIL (studeni 2026.)
 
-Novi zadani način automatskog praćenja čuva izvorne piksele **1:1** (do 12 MP na mobilnim uređajima i 20 MP na računalu; iznad te granice treba isključiti 1:1 ili koristiti manji izvorni PNG). Početno pojednostavljenje i zaglađivanje postavljeni su na **0**, a unutarnji otvori uključeni su prema zadanim postavkama. Podaci iz prozirnog alfa-kanala koriste se izravno; za neprozirni JPEG i PNG s jednolikom pozadinom algoritam gradi kontinuirano polje razlike boja.
+U Trace Studiju zadani način automatskog praćenja čuva izvorne piksele **1:1** (do 12 MP na mobilnim uređajima i 20 MP na računalu; iznad te granice treba isključiti 1:1 ili koristiti manji izvorni PNG). Početno pojednostavljenje i zaglađivanje postavljeni su na **0**, a unutarnji otvori uključeni su prema zadanim postavkama. Podaci iz prozirnog alfa-kanala koriste se izravno; za neprozirni JPEG i PNG s jednolikom pozadinom algoritam gradi kontinuirano polje razlike boja.
 
 Novi dodatni prekidač **„Prati i unutarnje granice različitih boja“** dodaje vektorske linije između područja drukčijih boja. Zadano je isključen jer gradijenti, šum i kompresijski artefakti mogu proizvesti mnoštvo neželjenih linija. Granica je 300 000 unutarnjih segmenata po obradi; sustav javlja pogrešku ako je prijeđena i preporučuje povećanje praga.
 
@@ -47,6 +47,23 @@ node --test tests/*.test.cjs
 ```
 
 GitHub Actions pokreće ove provjere nakon relevantnih promjena.
+
+
+## Full Vector v5: obnova siluete umjesto milijuna šumnih točaka
+
+Nekadašnji algoritam je **uvijek** stvarao 48 skupina boja i neovisno ocrtavao piksele iz svake skupine. Na gotovo crnoj fotografiji s kompresijskim šumom to je stvaralo desetke tisuća SVG putanja, bijele točkice i nazubljene obrise.
+
+Novi \`fullvector.js\` sada:
+1. Najprije vektorizira **cjelovitu siluetu logotipa** iz maske vidljivosti (alfa-kanal kad postoji) kao jednu osnovnu SVG površinu, uz podpikselno nalaženje granica i prilagodbu Bézierovih krivulja.
+2. Boje pronalazi iz **učestalih unutarnjih piksela**, ne iz najrjeđih ekstrema, pa slične tamne nijanse ne pretvara u zasebne oblike.
+3. Pomoću podesivog uklanjanja šuma odbacuje usitnjene promjene boje unutar punih površina i čuva razmjerno velike obojene regije.
+4. U SVG slojeve dodaje samo druge stvarne boje, dok transparentne unutarnje rupe ostaju otvorene zahvaljujući \`fill-rule="evenodd"\`.
+5. Čuva stvarne \`<path>\` vektore, bez ugrađene rasterizirane slike.
+
+Na početnoj stranici postoje dva podešavanja: maksimalan broj boja (1–16) i uklanjanje šuma (0–100%). To su izbori u **Full Vector** načinu rada, odvojeni od **Trace Studija**. Prejako uklanjanje šuma može izgubiti namjerno sitne detalje, a preslabo može sačuvati neželjenu kompresiju. Za najbolju vjernost koristi izvorni transparentni PNG.
+
+Dodatno je popravljen postupak uklanjanja pozadine za neprozirni JPEG/PNG: cijeli rub slike više se ne označava automatski kao pozadina, jer bi to izbrisalo logotip koji dodiruje rub slike. Obrada i dalje ima ograničenja za fotografsku, šarenu ili neujednačenu pozadinu i ne može matematički rekonstruirati izgubljene detalje originalnog vektorskog dizajna.
+
 
 ## Postojeći Full Vector
 
