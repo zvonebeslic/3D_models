@@ -331,7 +331,7 @@
   function exportSVG(paths,w,h,opts){
     var color=/^#[0-9a-f]{6}$/i.test(opts.color)?opts.color:"#000000";
     var width=clamp(Number(opts.strokeWidth)||.5,.1,30),filled=opts.style==="filled";
-    function dpath(p,isDetail){return opts.fit && root.TraceFit && !isDetail?
+    function dpath(p,isDetail){return opts.fit && root.TraceFit?
       root.TraceFit.pathD(p.points,!!p.closed,opts.fitTolerance):
       pathD(p.points,!!p.closed,isDetail?0:smooth);}
     var smooth=clamp(Number(opts.smooth)||0,0,100),parts=[];
