@@ -10,7 +10,7 @@ var els = {};
  "autoTolerance","autoToleranceValue","autoSmooth","autoSmoothValue","includeHoles",
  "traceBtn","showOriginal","pickColor","panBtn","pathColor","zoomSlider","zoomLabel","viewport",
  "artboard","emptyStage","sourceImage","drawingSurface","vectors","handles",
- "status","dimensions","vectorStats","exportStyle","strokeWidth","previewBtn","downloadBtn"].forEach(function (id) { els[id] = $(id); });
+ "status","dimensions","vectorStats","exportStyle","strokeWidth","previewBtn","downloadBtn","shareBtn","copySvgBtn","exportHelp"].forEach(function (id) { els[id] = $(id); });
 var ns = "http://www.w3.org/2000/svg";
 var state = {
   url: null, width: 0, height: 0, pixels: null, mode: "manual",
@@ -48,7 +48,14 @@ function setButtons() {
   els.panBtn.disabled = !loaded;
   var paths = currentPaths();
   els.downloadBtn.disabled = !paths.length;
+  els.shareBtn.disabled = !paths.length;
+  els.copySvgBtn.disabled = !paths.length;
   els.previewBtn.disabled = !paths.length;
+  els.exportHelp.textContent = !loaded ? "Učitaj logo pa nacrtaj linije ili automatski pronađi konturu." :
+    !paths.length ? (manual ?
+      "Gumb za preuzimanje aktivirat će se nakon prvog nacrtanog poteza. Povuci prstom po slici." :
+      "Gumb za preuzimanje aktivirat će se nakon pronalaska kontura. Klikni „Pronađi vanjske konture”.") :
+    "SVG je spreman: odaberi preuzimanje, Androidov izbornik za dijeljenje ili kopiranje koda.";
   var pts = paths.reduce(function (sum,p) { return sum + p.points.length; }, 0);
   els.vectorStats.textContent = paths.length + " putanja · " + pts + " čvorova";
 }
@@ -438,21 +445,74 @@ els.traceBtn.addEventListener("click", async function () {
     state.busy = false; setButtons();
   }
 });
-els.downloadBtn.addEventListener("click", function () {
+function buildExport() {
   var paths = currentPaths();
-  if (!paths.length) return;
+  if (!paths.length) throw new Error("Još nema nacrtanih putanja. Prvo nacrtaj rub ili pokreni automatsko praćenje.");
   var svg = core.exportSVG(paths, state.width, state.height, {
     color: els.pathColor.value,
     strokeWidth: els.strokeWidth.value,
     style: els.exportStyle.value,
     smooth: Number((state.mode === "manual" ? els.manualSmooth : els.autoSmooth).value)
   });
-  var blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-  var href = URL.createObjectURL(blob), a = document.createElement("a");
-  a.href = href; a.download = "logo-" + (state.mode === "manual" ? "rucno" : "kontura") + ".svg";
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(function () { URL.revokeObjectURL(href); }, 1000);
-  tell("✓ Čisti SVG preuzet. Datoteka sadrži samo prave vektorske putanje.", "ok");
+  if (!svg || !svg.includes("<path")) throw new Error("Nije moguće izvesti praznu vektorsku putanju.");
+  return {svg:svg, name: "logo-" + (state.mode === "manual" ? "rucno" : "kontura") + ".svg"};
+}
+function saveWithAnchor(svg, name) {
+  var blob = new Blob([svg], {type:"image/svg+xml;charset=utf-8"});
+  var href = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = href;
+  a.download = name;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Some mobile browsers start the save asynchronously. Keep the URL alive.
+  setTimeout(function () { URL.revokeObjectURL(href); }, 60000);
+}
+els.downloadBtn.addEventListener("click", function () {
+  try {
+    var item = buildExport();
+    saveWithAnchor(item.svg, item.name);
+    tell("Zahtjev za preuzimanje poslan pregledniku. Provjeri mapu Preuzimanja. Ako nije spremio SVG, klikni „Spremi / podijeli” (na mobitelu) ili „Kopiraj SVG kod”.", "ok");
+  } catch (e) { tell(e.message, "error"); }
+});
+els.shareBtn.addEventListener("click", async function () {
+  try {
+    var item = buildExport();
+    var file = new File([item.svg], item.name, { type: "image/svg+xml" });
+    // Use the native Android share sheet when file sharing is available.
+    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+      try {
+        await navigator.share({files:[file], title:item.name});
+        tell("SVG je poslan u Androidov izbornik. Odaberi aplikaciju ili lokaciju za spremanje.", "ok");
+      } catch (e) {
+        if (e.name !== "AbortError") tell("Dijeljenje nije uspjelo: " + e.message + ". Pokušaj Preuzmi ili Kopiraj SVG kod.", "error");
+      }
+    } else {
+      saveWithAnchor(item.svg, item.name);
+      tell("Ovaj preglednik ne podržava dijeljenje SVG datoteke. Pokušao sam standardno preuzimanje. Ako ne radi, odaberi Kopiraj SVG kod.", "ok");
+    }
+  } catch (e) { tell(e.message, "error"); }
+});
+els.copySvgBtn.addEventListener("click", async function () {
+  try {
+    var item = buildExport();
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(item.svg);
+    } else {
+      var area = document.createElement("textarea");
+      area.value = item.svg;
+      area.style.position = "fixed"; area.style.opacity = "0";
+      document.body.appendChild(area); area.focus(); area.select();
+      var copied = document.execCommand("copy");
+      area.remove();
+      if (!copied) throw new Error("Preglednik blokira međuspremnik.");
+    }
+    tell("✓ SVG kod kopiran. Možeš ga zalijepiti u tekstualnu datoteku s nastavkom .svg.", "ok");
+  } catch (e) {
+    tell("Kopiranje nije uspjelo: " + e.message + ". Probaj otvoriti stranicu u Chromeu umjesto unutar aplikacije.", "error");
+  }
 });
 setButtons();
 })();
