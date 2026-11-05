@@ -77,6 +77,8 @@
         <label class="control edgecontrol">Prag unutarnjih granica <output id="edgeToleranceValue">40</output>
           <input id="edgeTolerance" type="range" min="1" max="180" value="40" step="1">
         </label>
+        <button type="button" id="backgroundPick" disabled>◎ Dodirni boju pozadine</button>
+        <span class="hint" id="backgroundChip">Automatski izbor pozadine</span>
         <button type="button" id="traceBtn" class="strong" disabled>◎ ULTRA · Pronađi sve konture</button>
       </div>
       <small class="hint">Preciznost SVG koordinata: šest decimalnih mjesta (0,000001 px u zapisu). Stvarna točnost ovisi o kvaliteti izvora. Ako previše šuma ulazi u obris, povećaj prag pozadine.</small>
