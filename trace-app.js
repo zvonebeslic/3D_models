@@ -8,14 +8,14 @@ var els = {};
  "manualTolerance","manualToleranceValue","manualSmooth","manualSmoothValue",
  "backgroundTolerance","backgroundToleranceValue","alphaThreshold","alphaThresholdValue",
  "autoTolerance","autoToleranceValue","autoSmooth","autoSmoothValue","includeHoles","includeColorEdges","edgeTolerance","edgeToleranceValue",
- "traceBtn","showOriginal","pickColor","panBtn","pathColor","zoomSlider","zoomLabel","viewport",
+ "traceBtn","backgroundPick","backgroundChip","showOriginal","pickColor","panBtn","pathColor","zoomSlider","zoomLabel","viewport",
  "artboard","emptyStage","sourceImage","drawingSurface","vectors","handles",
  "status","dimensions","vectorStats","exportStyle","strokeWidth","previewBtn","downloadBtn","shareBtn","copySvgBtn","exportHelp"].forEach(function (id) { els[id] = $(id); });
 var ns = "http://www.w3.org/2000/svg";
 var state = {
   url: null, width: 0, height: 0, pixels: null, mode: "manual",
   manual: [], auto: [], selection: -1, drawing: null, drag: null,
-  history: [], future: [], picking: false, pan: false, busy: false
+  history: [], future: [], picking: false, pickingBg: false, backgroundColor: null, pan: false, busy: false
 };
 var core = window.TraceCore;
 if (!core) { els.status.textContent = "Greška: modul kontura nije učitan."; return; }
@@ -46,6 +46,7 @@ function setButtons() {
   els.traceBtn.disabled = !loaded || state.busy;
   els.pickColor.disabled = !loaded;
   els.panBtn.disabled = !loaded;
+  els.backgroundPick.disabled = !loaded;
   var paths = currentPaths();
   els.downloadBtn.disabled = !paths.length;
   els.shareBtn.disabled = !paths.length;
@@ -63,6 +64,7 @@ function currentPaths() { return state.mode === "manual" ? state.manual : state.
 function setMode(mode) {
   state.mode = mode;
   state.picking = false;
+  state.pickingBg = false;
   state.pan = false;
   els.panBtn.textContent = "✥ Pomakni prikaz";
   els.panBtn.setAttribute("aria-pressed", "false");
@@ -134,6 +136,8 @@ function loadFile(file) {
       state.hasAlpha = false;
       for (var ai = 3; ai < pixels.data.length; ai += 4) if (pixels.data[ai] < 250) { state.hasAlpha = true; break; }
       state.manual = []; state.auto = []; state.selection = -1;
+      state.backgroundColor = null;
+      els.backgroundChip.textContent = "Automatski izbor pozadine";
       state.history = []; state.future = []; state.drawing = null;
       els.sourceImage.src = nextUrl;
       els.sourceImage.hidden = !els.showOriginal.checked;
@@ -306,6 +310,18 @@ els.drawingSurface.addEventListener("pointerdown", function (e) {
     els.drawingSurface.setPointerCapture(e.pointerId);
     return;
   }
+  if (state.pickingBg) {
+    var ix = Math.min(state.width-1, Math.floor(p.x)), iy = Math.min(state.height-1, Math.floor(p.y));
+    var pos=(iy*state.width+ix)*4, rgba=state.pixels.data;
+    state.backgroundColor=[rgba[pos],rgba[pos+1],rgba[pos+2]];
+    var rgb=state.backgroundColor.map(function(v){return v.toString(16).padStart(2,"0");}).join("");
+    state.pickingBg=false;
+    els.drawingSurface.classList.remove("picking");
+    els.backgroundChip.textContent="Pozadina: #"+rgb;
+    els.backgroundChip.style.color="#"+rgb;
+    tell("✓ Boja pozadine odabrana. Sada ponovno pokreni praćenje kontura.", "ok");
+    return;
+  }
   if (state.picking) {
     var ix = Math.min(state.width - 1, Math.floor(p.x)), iy = Math.min(state.height - 1, Math.floor(p.y));
     var off = (iy * state.width + ix) * 4, d = state.pixels.data;
@@ -411,6 +427,14 @@ els.panBtn.addEventListener("click", function () {
   tell(state.pan ? "Povlačenjem po prikazu sada pomičeš sliku, bez crtanja." :
     "Pomicanje isključeno. Nastavi s praćenjem logotipa.");
 });
+els.backgroundPick.addEventListener("click", function() {
+  state.mode="auto";
+  setMode("auto");
+  state.pickingBg=true;
+  state.picking=false;state.pan=false;
+  els.drawingSurface.classList.add("picking");
+  tell("Dodirni jednoličnu pozadinu oko logotipa, ne sam logo. Zatim klikni „Pronađi konture”.");
+});
 els.pickColor.addEventListener("click", function () {
   state.picking = !state.picking;
   if (state.picking) {
@@ -464,6 +488,7 @@ els.traceBtn.addEventListener("click", async function () {
       tolerance: Number(els.autoTolerance.value) / 10,
       includeHoles: els.includeHoles.checked,
       includeColorEdges: els.includeColorEdges.checked,
+      backgroundColor: state.backgroundColor,
       edgeTolerance: Number(els.edgeTolerance.value),
       edgeSoftness: Number(els.edgeSoftness.value)
     });
