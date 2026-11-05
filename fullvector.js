@@ -98,12 +98,12 @@ function classify(mask,pixels,w,h,colors){
   return labels;
 }
 function majorityFilter(labels,w,h,passes){
-  var src=labels;
+  var src=labels,near=new Int32Array(8);
   for(var round=0;round<passes;round++){
     var next=src.slice(),changed=0;
     for(var y=1;y<h-1;y++)for(var x=1;x<w-1;x++){
       var p=y*w+x,current=src[p];if(current===255)continue;
-      var near=[p-w-1,p-w,p-w+1,p-1,p+1,p+w-1,p+w,p+w+1];
+      near[0]=p-w-1;near[1]=p-w;near[2]=p-w+1;near[3]=p-1;near[4]=p+1;near[5]=p+w-1;near[6]=p+w;near[7]=p+w+1;
       var own=0;
       for(var q of near)if(src[q]===current)own++;
       if(own>=3)continue;
@@ -129,13 +129,10 @@ function removeSmallRegions(labels,w,h,minPixels){
     var head=0,tail=1,label=labels[s];queue[0]=s;visited[s]=1;
     while(head<tail){
       var idx=queue[head++],x=idx%w,y=(idx/w)|0;
-      function visit(q){
-        if(!visited[q]&&labels[q]===label){visited[q]=1;queue[tail++]=q;}
-      }
-      if(x>0)visit(idx-1);
-      if(x<w-1)visit(idx+1);
-      if(y>0)visit(idx-w);
-      if(y<h-1)visit(idx+w);
+      if(x>0&&!visited[idx-1]&&labels[idx-1]===label){visited[idx-1]=1;queue[tail++]=idx-1;}
+      if(x<w-1&&!visited[idx+1]&&labels[idx+1]===label){visited[idx+1]=1;queue[tail++]=idx+1;}
+      if(y>0&&!visited[idx-w]&&labels[idx-w]===label){visited[idx-w]=1;queue[tail++]=idx-w;}
+      if(y<h-1&&!visited[idx+w]&&labels[idx+w]===label){visited[idx+w]=1;queue[tail++]=idx+w;}
     }
     if(tail>=minPixels)continue;
     // Keep tiny separate islands (letter accents or detached shapes).
@@ -187,11 +184,11 @@ function FullVector(mask,img,W,H,opts){
   if(!shape.paths)throw Error("Nije prepoznata silueta. Pokušaj drugačiji izvorni PNG.");
   var palette=paletteFor(foreground,pix,W,H,hasAlpha,clamp(Number(opts.maxColors)||12,1,16));
   var labels=classify(foreground,pix,W,H,palette);
-  var strength=clamp(Number(opts.denoise)==null?70:Number(opts.denoise),0,100);
+  var strength=clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
   var passes=strength<10?0:strength<45?1:2;
-  if(passes)labels=majorityFilter(labels,W,H,passes);
+  if(palette.length>1&&passes)labels=majorityFilter(labels,W,H,passes);
   var minRegion=strength<10?1:Math.max(3,Math.round(Math.min(100,N/90000)*(strength/70)));
-  var cleaned=removeSmallRegions(labels,W,H,minRegion);
+  var cleaned=palette.length>1?removeSmallRegions(labels,W,H,minRegion):{labels:labels,removed:0};
   labels=cleaned.labels;
   // Recompute actual area to choose the BASE layer correctly.
   var counts=new Int32Array(palette.length);
