@@ -216,7 +216,7 @@ function makeNode(tag, attributes) {
   return node;
 }
 function fittedPath(path, smooth) {
-  if (els.curveFit.checked && path.type !== "detail" && window.TraceFit)
+  if (els.curveFit.checked && window.TraceFit)
     return window.TraceFit.pathD(path.points, !!path.closed, Number(els.curveTolerance.value) / 100);
   return core.pathD(path.points, !!path.closed, path.type === "detail" ? 0 : smooth);
 }
@@ -237,7 +237,7 @@ function render() {
     els.vectors.appendChild(makeNode("path", { d: compound, fill: col, "fill-rule": "evenodd",
       stroke: col, "stroke-width": Math.max(0.2, displayStroke * 0.35), "stroke-linejoin": "round" }));
     paths.filter(function(p){return p.type==="detail";}).forEach(function(p){
-      els.vectors.appendChild(makeNode("path",{d:core.pathD(p.points,p.closed,0),
+      els.vectors.appendChild(makeNode("path",{d:fittedPath(p,0),
         fill:"none",stroke:"#ffcc00","stroke-width":displayStroke,"stroke-linecap":"round",
         "stroke-linejoin":"round","pointer-events":"none"}));
     });
