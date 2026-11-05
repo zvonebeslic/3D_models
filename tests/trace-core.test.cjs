@@ -141,6 +141,6 @@ test("ultra mode is the default and cache-busted scripts are used",()=>{
   assert.match(html,/id="nativePixels"[^>]*checked/);
   assert.match(html,/id="autoTolerance"[^>]*value="0"/);
   assert.match(html,/id="autoSmooth"[^>]*value="0"/);
-  assert.match(html,/trace-core\.js\?v=ultra2/);
+  assert.match(html,/trace-core\.js\?v=curves4/);
   assert.match(js,/var full = els\.nativePixels\.checked/);
 });
