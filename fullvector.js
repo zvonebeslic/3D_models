@@ -155,7 +155,7 @@ function removeSmallRegions(labels,w,h,minPixels){
   return{labels:labels,removed:removed};
 }
 function toPath(loops,fitTolerance){
-  var pieces=[],points=0;
+  var pieces=[],points=0,segments=0;
   for(var loop of loops){
     if(loop.length<3||Math.abs(area(loop))<.40)continue;
     var d=(root.TraceFit&&root.TraceFit.pathD)?
@@ -163,8 +163,9 @@ function toPath(loops,fitTolerance){
       "M"+loop.map(function(p){return p.x.toFixed(3)+" "+p.y.toFixed(3);}).join(" L")+" Z";
     if(!d)continue;
     pieces.push(d);points+=loop.length;
+    segments+=(d.match(/ [LC]/g)||[]).length;
   }
-  return{d:pieces.join(" "),paths:pieces.length,points:points};
+  return{d:pieces.join(" "),paths:pieces.length,points:points,segments:segments};
 }
 function FullVector(mask,img,W,H,opts){
   opts=opts||{};
@@ -196,7 +197,7 @@ function FullVector(mask,img,W,H,opts){
   var base=0;
   for(var k=1;k<counts.length;k++)if(counts[k]>counts[base])base=k;
   var body=['<path d="'+shape.d+'" fill="'+hex(palette[base])+'" fill-rule="evenodd"/>'];
-  var totalPaths=shape.paths,totalPoints=shape.points,colors=1;
+  var totalPaths=shape.paths,totalPoints=shape.points,totalSegments=shape.segments,colors=1;
   for(var k=0;k<palette.length;k++){
     if(k===base||counts[k]<minRegion)continue;
     var region=new Uint8Array(N);
@@ -204,11 +205,11 @@ function FullVector(mask,img,W,H,opts){
     var vector=toPath(geom.traceIso(region,W,H,128),.7);
     if(!vector.paths)continue;
     body.push('<path d="'+vector.d+'" fill="'+hex(palette[k])+'" fill-rule="evenodd"/>');
-    totalPaths+=vector.paths;totalPoints+=vector.points;colors++;
+    totalPaths+=vector.paths;totalPoints+=vector.points;totalSegments+=vector.segments;colors++;
   }
   var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+
     '" viewBox="0 0 '+W+' '+H+'" shape-rendering="geometricPrecision">'+body.join("")+'</svg>';
-  return{svg:svg,colors:colors,paths:totalPaths,points:totalPoints,noiseRemoved:cleaned.removed,
+  return{svg:svg,colors:colors,paths:totalPaths,points:totalPoints,segments:totalSegments,noiseRemoved:cleaned.removed,
     baseColor:hex(palette[base]),sourceColors:palette.length,hasAlpha:hasAlpha};
 }
 root.FullVector=FullVector;
