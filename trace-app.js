@@ -7,7 +7,7 @@ var els = {};
  "manualControls","autoControls","snapEdges","nativePixels","undoBtn","redoBtn","closeBtn","deleteBtn","clearBtn",
  "manualTolerance","manualToleranceValue","manualSmooth","manualSmoothValue",
  "backgroundTolerance","backgroundToleranceValue","alphaThreshold","alphaThresholdValue",
- "autoTolerance","autoToleranceValue","autoSmooth","autoSmoothValue","includeHoles",
+ "autoTolerance","autoToleranceValue","autoSmooth","autoSmoothValue","includeHoles","includeColorEdges","edgeTolerance","edgeToleranceValue",
  "traceBtn","showOriginal","pickColor","panBtn","pathColor","zoomSlider","zoomLabel","viewport",
  "artboard","emptyStage","sourceImage","drawingSurface","vectors","handles",
  "status","dimensions","vectorStats","exportStyle","strokeWidth","previewBtn","downloadBtn","shareBtn","copySvgBtn","exportHelp"].forEach(function (id) { els[id] = $(id); });
@@ -225,15 +225,21 @@ function render() {
   var scale = els.artboard.clientWidth / state.width || 1;
   var displayStroke = Math.min(5, Math.max(.2, 1.2 / scale));
   var isFilled = els.exportStyle.value === "filled";
-  if (state.mode === "auto" && paths.length && isFilled) {
-    // A single even-odd shape keeps holes genuinely hollow.
-    var compound = paths.map(function (p) { return core.pathD(p.points, true, smooth); }).join(" ");
+  if (state.mode === "auto" && paths.some(function(p){return p.type==="auto";}) && isFilled) {
+    // Internal color lines are strokes, not filled holes.
+    var outer=paths.filter(function(p){return p.type==="auto";});
+    var compound = outer.map(function (p) { return core.pathD(p.points, true, smooth); }).join(" ");
     els.vectors.appendChild(makeNode("path", { d: compound, fill: col, "fill-rule": "evenodd",
-      stroke: col, "stroke-width": Math.max(0.4, displayStroke * 0.35), "stroke-linejoin": "round" }));
+      stroke: col, "stroke-width": Math.max(0.2, displayStroke * 0.35), "stroke-linejoin": "round" }));
+    paths.filter(function(p){return p.type==="detail";}).forEach(function(p){
+      els.vectors.appendChild(makeNode("path",{d:core.pathD(p.points,p.closed,0),
+        fill:"none",stroke:"#ffcc00","stroke-width":displayStroke,"stroke-linecap":"round",
+        "stroke-linejoin":"round","pointer-events":"none"}));
+    });
   } else {
     paths.forEach(function (p, i) {
-      var d = core.pathD(p.points, p.closed, smooth);
-      var node = makeNode("path", { d: d, fill: isFilled && p.closed ? col : "none",
+      var d = core.pathD(p.points, p.closed, p.type==="detail"?0:smooth);
+      var node = makeNode("path", { d: d, fill: isFilled && p.closed && p.type!=="detail" ? col : "none",
         stroke: state.selection === i && state.mode === "manual" ? "#158cff" : col,
         "stroke-width": displayStroke, "stroke-linecap": "round", "stroke-linejoin": "round",
         "data-path-index": i, "class": "vector-path" + (state.selection === i && state.mode === "manual" ? " active" : "") });
@@ -427,11 +433,12 @@ watchSlider("manualSmooth","manualSmoothValue",function(v) { return v+"%"; });
 watchSlider("autoSmooth","autoSmoothValue",function(v) { return v+"%"; });
 watchSlider("backgroundTolerance","backgroundToleranceValue",function(v) { return v; });
 watchSlider("alphaThreshold","alphaThresholdValue",function(v) { return v+"%"; });
+watchSlider("edgeTolerance","edgeToleranceValue",function(v) { return v; });
 
 els.traceBtn.addEventListener("click", async function () {
   if (!state.pixels || state.busy) return;
   state.busy = true; setButtons();
-  tell("Tražim rubove, zatvaram konture i uklanjam šum…");
+  tell("ULTRA DETAIL: analiziram izvorne piksele, rubove i sve tražene detalje…");
   try {
     // Give the browser a chance to paint the progress message.
     await new Promise(function(resolve) { setTimeout(resolve, 30); });
@@ -439,13 +446,15 @@ els.traceBtn.addEventListener("click", async function () {
       bgTolerance: Number(els.backgroundTolerance.value),
       alphaThreshold: Number(els.alphaThreshold.value),
       tolerance: Number(els.autoTolerance.value) / 10,
-      includeHoles: els.includeHoles.checked
+      includeHoles: els.includeHoles.checked,
+      includeColorEdges: els.includeColorEdges.checked,
+      edgeTolerance: Number(els.edgeTolerance.value)
     });
     state.auto = found.paths;
     if (!state.auto.length) {
       tell("Nisam pronašao zatvorene konture. Pokušaj drugi prag ili PNG s prozirnom pozadinom.", "error");
     } else {
-      tell("✓ Pronađeno " + found.paths.length + " vektorskih kontura. " + found.note, "ok");
+      tell("✓ Pronađeno " + found.contoursFound + " kontura i " + found.detailCount + " unutarnjih detaljnih putanja. " + found.note, "ok");
     }
     render();
   } catch (e) {
