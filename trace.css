@@ -16,3 +16,10 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.
 .artboard svg.panning,.artboard svg.panning .hit-path{cursor:grab!important}
 .artboard svg.panning:active{cursor:grabbing!important}
 .viewtools button[aria-pressed="true"]{background:#176468;border-color:#4adacb;color:#fff}
+
+/* Precision controls, separate from the tracing tools. */
+.curvecontrols{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:15px;margin:12px 0 18px;border:1px solid #345a64;border-radius:14px;background:linear-gradient(120deg,#0b2c32,#151c34)}
+.curvecontrols>.check{flex:1 1 100%;font-size:14px;color:#e6fff9}
+.curvecontrols>.control{flex:1 1 185px}
+.curvecontrols>.hint{flex-basis:100%;margin-top:0}
+#backgroundChip{font-size:12px;display:inline-flex;align-items:center}
