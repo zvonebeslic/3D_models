@@ -70,7 +70,7 @@
     var gw = w + 2, gh = h + 2, grid = new Uint8Array(gw * gh);
     for (var y = 0; y < h; y++) grid.set(values.subarray(y * w, (y + 1) * w), (y + 1) * gw + 1);
     var segments = [], adjacency = new Map();
-    function key(p) { return Math.round(p.x * 10000) + "," + Math.round(p.y * 10000); }
+    function key(p) { return p.x.toFixed(9) + "," + p.y.toFixed(9); }
     function add(a, b) {
       if (dist2(a, b) < 1e-12) return;
       var i = segments.length; segments.push([a, b]);
@@ -141,7 +141,7 @@
       }
       if (key(current) === origin && chain.length >= 4) {
         chain.pop(); // SVG Z, not a duplicate vertex, closes the loop
-        if (Math.abs(area(chain)) >= 1.5) rings.push(chain);
+        if (Math.abs(area(chain)) >= 0.000001) rings.push(chain);
       }
     }
     return rings;
@@ -151,78 +151,76 @@
     var minAlpha = 255;
     for (var i = 0; i < n; i++) if (rgba[4 * i + 3] < minAlpha) minAlpha = rgba[4 * i + 3];
     if (minAlpha < 250) {
+      // An existing alpha mask is the highest-quality source: do not threshold,
+      // smooth, resample, binarize or otherwise discard antialiased edge pixels.
       for (var ai = 0; ai < n; ai++) values[ai] = rgba[4 * ai + 3];
-      return { values: values, type: "alpha", note: "Kontura iz alfa-kanala (prozirni PNG/WEBP)." };
+      return {values:values, type:"alpha",
+        note:"Izvorni alfa-kanal: svi dostupni rubni pikseli sačuvani."};
     }
-    // Reference background is the dominant of four corner swatches, not image-wide white.
+    // JPEG / opaque PNG fallback. Select the dominant color on the four corners.
+    // This works for logos with a near-uniform background, not photographs.
     var corners = [[0,0],[w-1,0],[0,h-1],[w-1,h-1]], samples = [];
-    for (var c = 0; c < corners.length; c++) {
-      var sum = [0,0,0], count = 0, cx = corners[c][0], cy = corners[c][1];
-      for (var dy = 0; dy < Math.min(5, h); dy++)
-        for (var dx = 0; dx < Math.min(5, w); dx++) {
-          var sx = clamp(cx + (cx ? -dx : dx), 0, w-1);
-          var sy = clamp(cy + (cy ? -dy : dy), 0, h-1);
-          var pi = (sy * w + sx) * 4;
-          for (var ch = 0; ch < 3; ch++) sum[ch] += rgba[pi + ch];
-          count++;
-        }
-      samples.push(sum.map(function (v) { return v / count; }));
-    }
-    var best = 0, score = -1;
-    for (var a = 0; a < samples.length; a++) {
-      var matches = 0;
-      for (var b = 0; b < samples.length; b++) {
-        var d = 0;
-        for (var k = 0; k < 3; k++) d += (samples[a][k] - samples[b][k]) ** 2;
-        if (d < 45 ** 2) matches++;
+    for (var z = 0; z < corners.length; z++) {
+      var sum = [0,0,0], count = 0, cx=corners[z][0], cy=corners[z][1];
+      for (var dy=0;dy<Math.min(5,h);dy++) for (var dx=0;dx<Math.min(5,w);dx++) {
+        var sx=clamp(cx+(cx?-dx:dx),0,w-1), sy=clamp(cy+(cy?-dy:dy),0,h-1), k=(sy*w+sx)*4;
+        for(var ch=0;ch<3;ch++)sum[ch]+=rgba[k+ch];
+        count++;
       }
-      if (matches > score) { score = matches; best = a; }
+      samples.push(sum.map(function(v){return v/count;}));
     }
-    var bg = samples[best], maxDist = opts.bgTolerance * opts.bgTolerance * 3;
-    var outside = new Uint8Array(n), queue = new Int32Array(n), head = 0, tail = 0;
-    function similar(idx) {
-      var off = idx * 4, d0 = rgba[off] - bg[0], d1 = rgba[off + 1] - bg[1], d2 = rgba[off + 2] - bg[2];
-      return d0*d0 + d1*d1 + d2*d2 <= maxDist;
+    var best=0, matches=-1;
+    for (var a=0;a<samples.length;a++) {
+      var countNear=0;
+      for (var b=0;b<samples.length;b++) {
+        var d=0;
+        for(var t=0;t<3;t++)d+=(samples[a][t]-samples[b][t])**2;
+        if(d<45*45)countNear++;
+      }
+      if(countNear>matches){matches=countNear;best=a;}
     }
-    function addPixel(idx) {
-      if (!outside[idx] && similar(idx)) { outside[idx] = 1; queue[tail++] = idx; }
+    var bg=samples[best], tol=Math.max(1,Number(opts.bgTolerance)||42);
+    // Continuous foreground confidence instead of old binary flood fill.
+    // Marching squares interpolates through the threshold at subpixel positions.
+    for(var p=0;p<n;p++) {
+      var o=p*4, r=rgba[o]-bg[0], g=rgba[o+1]-bg[1], b=rgba[o+2]-bg[2];
+      var delta=Math.sqrt((r*r+g*g+b*b)/3);
+      values[p]=Math.round(clamp(delta / tol * 128,0,255));
     }
-    for (var x = 0; x < w; x++) { addPixel(x); addPixel((h - 1) * w + x); }
-    for (var y = 1; y < h - 1; y++) { addPixel(y * w); addPixel(y * w + w - 1); }
-    while (head < tail) {
-      var p = queue[head++], px = p % w, py = Math.floor(p / w);
-      if (px > 0) addPixel(p - 1);
-      if (px + 1 < w) addPixel(p + 1);
-      if (py > 0) addPixel(p - w);
-      if (py + 1 < h) addPixel(p + w);
-    }
-    if (opts.includeHoles) {
-      // Optional removal of internal areas matching the known background color.
-      // It intentionally remains OFF by default to protect white areas in multicolor logos.
-      for (var j = 0; j < n; j++) if (!outside[j] && similar(j)) outside[j] = 1;
-    }
-    for (var z = 0; z < n; z++) values[z] = outside[z] ? 0 : 255;
-    return { values: values, type: "opaque", note: tail ?
-      "Povezana vanjska pozadina uklonjena; izvorna slika ostala je netaknuta." :
-      "Nijedan rub nije prepoznat kao pozadina. Provjeri prag ili koristi prozirni PNG." };
+    return {values:values, type:"opaque",
+      note:"Rub procijenjen iz kontinuirane razlike boje prema pozadini. Za najbolji rezultat koristi prozirni PNG."};
   }
-  function contours(image, w, h, opts) {
-    var src = sourceMask(image, w, h, opts);
-    var rings = traceIso(src.values, w, h, src.type === "alpha" ? Math.round(opts.alphaThreshold * 2.55) : 128);
-    var minimum = Math.max(2, w * h * 0.000002);
-    rings = rings.filter(function (p) { return Math.abs(area(p)) >= minimum; });
-    rings.sort(function (a, b) { return Math.abs(area(b)) - Math.abs(area(a)); });
-    var output = [];
-    for (var i = 0; i < rings.length; i++) {
-      var p = rings[i][0], depth = 0;
-      for (var j = 0; j < i; j++) if (inside(p, rings[j])) depth++;
-      if (!opts.includeHoles && depth % 2) continue;
-      var cleaned = simplify(rings[i], opts.tolerance, true);
-      if (cleaned.length >= 3) output.push({ points: cleaned, closed: true, type: "auto", depth: depth });
+  function contours(image,w,h,opts) {
+    var src=sourceMask(image,w,h,opts);
+    var cutoff=src.type==="alpha"?Math.round(clamp(opts.alphaThreshold,1,99)*2.55):128;
+    var rings=traceIso(src.values,w,h,cutoff);
+    var minArea=Math.max(0,Number(opts.minArea)||0);
+    // In ULTRA mode, even a one-pixel island is meaningful. Never use an
+    // image-size-dependent minimum area that deletes small lettering or symbols.
+    rings=rings.filter(function(p){return Math.abs(area(p)) >= minArea;});
+    rings.sort(function(a,b){return Math.abs(area(b))-Math.abs(area(a));});
+    var output=[];
+    var boxes=rings.map(function(ring){
+      var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      for(var v of ring){minX=Math.min(minX,v.x);minY=Math.min(minY,v.y);maxX=Math.max(maxX,v.x);maxY=Math.max(maxY,v.y);}
+      return {minX,minY,maxX,maxY};
+    });
+    for(var i=0;i<rings.length;i++){
+      var point=rings[i][0],depth=0,box=boxes[i];
+      for(var j=0;j<i;j++){
+        var parent=boxes[j];
+        if(parent.minX>=box.minX||parent.maxX<=box.maxX||
+           parent.minY>=box.minY||parent.maxY<=box.maxY) continue;
+        if(inside(point,rings[j]))depth++;
+      }
+      if(!opts.includeHoles&&depth%2)continue;
+      var tolerance=Math.max(0,Number(opts.tolerance)||0);
+      var vertices=tolerance>0?simplify(rings[i],tolerance,true):rings[i];
+      if(vertices.length>=3)output.push({points:vertices,closed:true,type:"auto",depth:depth});
     }
-    return { paths: output, note: src.note, source: src.type, contoursFound: rings.length };
+    return {paths:output,note:src.note,source:src.type,contoursFound:rings.length};
   }
-  function rounded(v) { return String(Number(v.toFixed(3))); }
+  function rounded(v) { return String(Number(v.toFixed(6))); }
   function pathD(points, closed, smooth) {
     if (!points || points.length < (closed ? 3 : 2)) return "";
     var n = points.length, d = "M" + rounded(points[0].x) + " " + rounded(points[0].y);
