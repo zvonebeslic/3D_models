@@ -10,3 +10,5 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 /* Hidden state must outrank component layout, especially on mobile. */
 [hidden]{display:none!important}
+
+.hit-path{cursor:pointer}
