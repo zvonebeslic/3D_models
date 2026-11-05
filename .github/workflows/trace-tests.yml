@@ -28,4 +28,5 @@ jobs:
           node-version: "22"
       - run: node --check trace-core.js
       - run: node --check trace-app.js
-      - run: node --test tests/trace-core.test.cjs
+      - run: node --check trace-fit.js
+      - run: node --test tests/*.test.cjs
