@@ -241,10 +241,30 @@
     }
     return result;
   }
+  // Small anti-staircase filter, applied to scalar edge confidence, not RGB.
+  // Strength is controlled in 0..100; even a 1px fully opaque island survives.
+  function softenMask(values,w,h,strength){
+    var k=clamp(Number(strength)||0,0,100)/100*.12;
+    if(k<=0||w<3||h<3)return values;
+    var tmp=new Uint8Array(values.length),res=new Uint8Array(values.length),center=1-2*k;
+    for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+      var p=y*w+x;
+      tmp[p]=Math.round(values[p]*center+
+        values[y*w+Math.max(0,x-1)]*k+values[y*w+Math.min(w-1,x+1)]*k);
+    }
+    for(var yy=0;yy<h;yy++)for(var xx=0;xx<w;xx++){
+      var n=yy*w+xx;
+      res[n]=Math.round(tmp[n]*center+
+        tmp[Math.max(0,yy-1)*w+xx]*k+
+        tmp[Math.min(h-1,yy+1)*w+xx]*k);
+    }
+    return res;
+  }
   function contours(image,w,h,opts) {
     var src=sourceMask(image,w,h,opts);
     var cutoff=src.type==="alpha"?Math.round(clamp(opts.alphaThreshold,1,99)*2.55):128;
-    var rings=traceIso(src.values,w,h,cutoff);
+    var mask=softenMask(src.values,w,h,opts.edgeSoftness);
+    var rings=traceIso(mask,w,h,cutoff);
     var minArea=Math.max(0,Number(opts.minArea)||0);
     // In ULTRA mode, even a one-pixel island is meaningful. Never use an
     // image-size-dependent minimum area that deletes small lettering or symbols.
@@ -311,18 +331,21 @@
   function exportSVG(paths,w,h,opts){
     var color=/^#[0-9a-f]{6}$/i.test(opts.color)?opts.color:"#000000";
     var width=clamp(Number(opts.strokeWidth)||.5,.1,30),filled=opts.style==="filled";
+    function dpath(p,isDetail){return opts.fit && root.TraceFit && !isDetail?
+      root.TraceFit.pathD(p.points,!!p.closed,opts.fitTolerance):
+      pathD(p.points,!!p.closed,isDetail?0:smooth);}
     var smooth=clamp(Number(opts.smooth)||0,0,100),parts=[];
     var auto=paths.filter(function(p){return p.type==="auto";});
     var detail=paths.filter(function(p){return p.type==="detail";});
     var manual=paths.filter(function(p){return p.type!=="auto"&&p.type!=="detail";});
     if(auto.length){
-      var d=auto.map(function(p){return pathD(p.points,true,smooth);}).filter(Boolean).join(" ");
+      var d=auto.map(function(p){return dpath(p,false);}).filter(Boolean).join(" ");
       if(d)parts.push('<path d="'+d+'" fill-rule="evenodd" fill="'+(filled?color:"none")+
         '" stroke="'+(filled?"none":color)+'" stroke-width="'+rounded(width)+
         '" stroke-linejoin="round" stroke-linecap="round"/>');
     }
     for(var path of detail.concat(manual)) {
-      var d=pathD(path.points,!!path.closed,path.type==="detail"?0:smooth);
+      var d=dpath(path,path.type==="detail");
       if(!d)continue;
       var fill=filled&&path.closed&&path.type!=="detail"?color:"none";
       parts.push('<path d="'+d+'" fill="'+fill+'" stroke="'+(fill!=="none"?"none":color)+
@@ -332,5 +355,5 @@
       '" viewBox="0 0 '+w+' '+h+'" shape-rendering="geometricPrecision">\n'+parts.join("\n")+'\n</svg>\n';
   }
   root.TraceCore = { contours: contours, simplify: simplify, pathD: pathD, exportSVG: exportSVG,
-    _test: { traceIso: traceIso, area: area, sourceMask: sourceMask, traceColorBoundaries: traceColorBoundaries } };
+    _test: { traceIso: traceIso, area: area, sourceMask: sourceMask, traceColorBoundaries: traceColorBoundaries, softenMask:softenMask } };
 })(typeof window !== "undefined" ? window : globalThis);
