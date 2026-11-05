@@ -190,6 +190,57 @@
     return {values:values, type:"opaque",
       note:"Rub procijenjen iz kontinuirane razlike boje prema pozadini. Za najbolji rezultat koristi prozirni PNG."};
   }
+  // Optional pixel-accurate interior color boundaries, independent of the
+  // main silhouette. This preserves internal linework that an alpha mask
+  // alone cannot see (e.g., colored letters inside a solid logo).
+  function traceColorBoundaries(image,w,h,foreground,threshold) {
+    var rgba=image.data, segments=[],neighbors=new Map(), limit=300000;
+    function key(p){return p.x+","+p.y;}
+    function add(a,b) {
+      if(segments.length>=limit)throw Error("Unutarnji detalji imaju više od "+limit+
+        " rubnih segmenata. Povećaj prag boja ili isključi unutarnje granice.");
+      var id=segments.length; segments.push([a,b]);
+      for(var point of [a,b]) {
+        var k=key(point),list=neighbors.get(k);
+        if(list)list.push(id);else neighbors.set(k,[id]);
+      }
+    }
+    function contrast(a,b) {
+      var ia=a*4,ib=b*4,dr=rgba[ia]-rgba[ib],dg=rgba[ia+1]-rgba[ib+1],db=rgba[ia+2]-rgba[ib+2];
+      return (dr*dr+dg*dg+db*db)>=3*threshold*threshold;
+    }
+    for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+      var n=y*w+x;
+      if(foreground[n]<128)continue;
+      if(x+1<w&&foreground[n+1]>=128&&contrast(n,n+1)) {
+        add({x:x+1,y:y},{x:x+1,y:y+1});
+      }
+      if(y+1<h&&foreground[n+w]>=128&&contrast(n,n+w)) {
+        add({x:x,y:y+1},{x:x+1,y:y+1});
+      }
+    }
+    var used=new Uint8Array(segments.length),result=[];
+    function degree(p){return (neighbors.get(key(p))||[]).length;}
+    for(var i=0;i<segments.length;i++){
+      if(used[i])continue;
+      var a=segments[i][0],b=segments[i][1];
+      var start=degree(a)!==2?a:(degree(b)!==2?b:a);
+      var current=start,chain=[start],nextId=i,closed=false;
+      for(var count=0;count<=segments.length;count++) {
+        if(used[nextId])break;
+        used[nextId]=1;
+        var s=segments[nextId],curkey=key(current);
+        current=key(s[0])===curkey?s[1]:s[0];
+        if(key(current)===key(start)){closed=true;break;}
+        chain.push(current);
+        if(degree(current)!==2)break; // retain junctions; no random branch turns
+        nextId=(neighbors.get(key(current))||[]).find(function(id){return !used[id];});
+        if(nextId===undefined)break;
+      }
+      if(chain.length>=(closed?3:2))result.push({points:chain,closed:closed,type:"detail",depth:0});
+    }
+    return result;
+  }
   function contours(image,w,h,opts) {
     var src=sourceMask(image,w,h,opts);
     var cutoff=src.type==="alpha"?Math.round(clamp(opts.alphaThreshold,1,99)*2.55):128;
@@ -218,7 +269,13 @@
       var vertices=tolerance>0?simplify(rings[i],tolerance,true):rings[i];
       if(vertices.length>=3)output.push({points:vertices,closed:true,type:"auto",depth:depth});
     }
-    return {paths:output,note:src.note,source:src.type,contoursFound:rings.length};
+    var detailCount=0;
+    if(opts.includeColorEdges) {
+      var edges=traceColorBoundaries(image,w,h,src.values,Math.max(1,Number(opts.edgeTolerance)||40));
+      detailCount=edges.length;
+      output.push.apply(output,edges);
+    }
+    return {paths:output,note:src.note,source:src.type,contoursFound:rings.length,detailCount:detailCount};
   }
   function rounded(v) { return String(Number(v.toFixed(6))); }
   function pathD(points, closed, smooth) {
@@ -243,31 +300,29 @@
     }
     return d + (closed ? " Z" : "");
   }
-  function exportSVG(paths, w, h, opts) {
-    var color = /^#[0-9a-f]{6}$/i.test(opts.color) ? opts.color : "#000000";
-    var width = clamp(Number(opts.strokeWidth) || 2, .1, 30);
-    var isFilled = opts.style === "filled";
-    var smooth = clamp(Number(opts.smooth) || 0, 0, 100);
-    var parts = [];
-    var auto = paths.length && paths.every(function (p) { return p.type === "auto"; });
-    if (auto) {
-      var d = paths.map(function (p) { return pathD(p.points, true, smooth); }).filter(Boolean).join(" ");
-      if (d) parts.push('<path d="' + d + '" fill-rule="evenodd" fill="' +
-        (isFilled ? color : "none") + '" stroke="' + (isFilled ? "none" : color) +
-        '" stroke-width="' + rounded(width) + '" stroke-linejoin="round" stroke-linecap="round"/>');
-    } else {
-      for (var path of paths) {
-        var command = pathD(path.points, !!path.closed, smooth);
-        if (!command) continue;
-        parts.push('<path d="' + command + '" fill="' + (isFilled && path.closed ? color : "none") +
-          '" stroke="' + (isFilled && path.closed ? "none" : color) + '" stroke-width="' +
-          rounded(width) + '" stroke-linecap="round" stroke-linejoin="round"/>');
-      }
+  function exportSVG(paths,w,h,opts){
+    var color=/^#[0-9a-f]{6}$/i.test(opts.color)?opts.color:"#000000";
+    var width=clamp(Number(opts.strokeWidth)||.5,.1,30),filled=opts.style==="filled";
+    var smooth=clamp(Number(opts.smooth)||0,0,100),parts=[];
+    var auto=paths.filter(function(p){return p.type==="auto";});
+    var detail=paths.filter(function(p){return p.type==="detail";});
+    var manual=paths.filter(function(p){return p.type!=="auto"&&p.type!=="detail";});
+    if(auto.length){
+      var d=auto.map(function(p){return pathD(p.points,true,smooth);}).filter(Boolean).join(" ");
+      if(d)parts.push('<path d="'+d+'" fill-rule="evenodd" fill="'+(filled?color:"none")+
+        '" stroke="'+(filled?"none":color)+'" stroke-width="'+rounded(width)+
+        '" stroke-linejoin="round" stroke-linecap="round"/>');
     }
-    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h +
-      '" viewBox="0 0 ' + w + ' ' + h + '" fill="none" shape-rendering="geometricPrecision">\n' +
-      parts.join("\n") + '\n</svg>\n';
+    for(var path of detail.concat(manual)) {
+      var d=pathD(path.points,!!path.closed,path.type==="detail"?0:smooth);
+      if(!d)continue;
+      var fill=filled&&path.closed&&path.type!=="detail"?color:"none";
+      parts.push('<path d="'+d+'" fill="'+fill+'" stroke="'+(fill!=="none"?"none":color)+
+        '" stroke-width="'+rounded(width)+'" stroke-linecap="round" stroke-linejoin="round"/>');
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+
+      '" viewBox="0 0 '+w+' '+h+'" shape-rendering="geometricPrecision">\n'+parts.join("\n")+'\n</svg>\n';
   }
   root.TraceCore = { contours: contours, simplify: simplify, pathD: pathD, exportSVG: exportSVG,
-    _test: { traceIso: traceIso, area: area, sourceMask: sourceMask } };
+    _test: { traceIso: traceIso, area: area, sourceMask: sourceMask, traceColorBoundaries: traceColorBoundaries } };
 })(typeof window !== "undefined" ? window : globalThis);
