@@ -4,6 +4,11 @@ on:
     branches: [main]
     paths:
       - "trace-core.js"
+      - "trace-fit.js"
+      - "fullvector.js"
+      - "vector.js"
+      - "index.html"
+      - "style.css"
       - "trace-app.js"
       - "trace.html"
       - "trace.css"
@@ -28,5 +33,7 @@ jobs:
           node-version: "22"
       - run: node --check trace-core.js
       - run: node --check trace-app.js
+      - run: node --check vector.js
+      - run: node --check fullvector.js
       - run: node --check trace-fit.js
       - run: node --test tests/*.test.cjs
