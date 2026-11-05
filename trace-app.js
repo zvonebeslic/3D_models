@@ -1,0 +1,386 @@
+/* Logo Trace Studio controller. No APIs, external models or third-party tracing packages. */
+(function () {
+"use strict";
+var $ = function (id) { return document.getElementById(id); };
+var els = {};
+["fileInput","dropZone","fileDetails","fileName","replaceImage","manualTab","autoTab",
+ "manualControls","autoControls","undoBtn","redoBtn","closeBtn","deleteBtn","clearBtn",
+ "manualTolerance","manualToleranceValue","manualSmooth","manualSmoothValue",
+ "backgroundTolerance","backgroundToleranceValue","alphaThreshold","alphaThresholdValue",
+ "autoTolerance","autoToleranceValue","autoSmooth","autoSmoothValue","includeHoles",
+ "traceBtn","showOriginal","pickColor","pathColor","zoomSlider","zoomLabel","viewport",
+ "artboard","emptyStage","sourceImage","drawingSurface","vectors","handles",
+ "status","dimensions","vectorStats","exportStyle","strokeWidth","previewBtn","downloadBtn"].forEach(function (id) { els[id] = $(id); });
+var ns = "http://www.w3.org/2000/svg";
+var state = {
+  url: null, width: 0, height: 0, pixels: null, mode: "manual",
+  manual: [], auto: [], selection: -1, drawing: null, drag: null,
+  history: [], future: [], picking: false, busy: false
+};
+var core = window.TraceCore;
+if (!core) { els.status.textContent = "Greška: modul kontura nije učitan."; return; }
+
+function tell(message, kind) {
+  els.status.textContent = message;
+  els.status.className = "status" + (kind ? " " + kind : "");
+}
+function clonePaths(list) {
+  return list.map(function (p) {
+    return { closed: !!p.closed, type: p.type, depth: p.depth || 0,
+      points: p.points.map(function (v) { return { x: v.x, y: v.y }; }) };
+  });
+}
+function beforeEdit() {
+  state.history.push(clonePaths(state.manual));
+  if (state.history.length > 40) state.history.shift();
+  state.future = [];
+}
+function setButtons() {
+  var loaded = !!state.pixels, manual = state.mode === "manual";
+  els.undoBtn.disabled = !manual || !state.history.length;
+  els.redoBtn.disabled = !manual || !state.future.length;
+  els.clearBtn.disabled = !manual || !state.manual.length;
+  els.deleteBtn.disabled = !manual || state.selection < 0;
+  els.closeBtn.disabled = !manual || state.selection < 0 || !!(state.manual[state.selection] || {}).closed ||
+    (state.manual[state.selection] || { points: [] }).points.length < 3;
+  els.traceBtn.disabled = !loaded || state.busy;
+  els.pickColor.disabled = !loaded;
+  var paths = currentPaths();
+  els.downloadBtn.disabled = !paths.length;
+  els.previewBtn.disabled = !paths.length;
+  var pts = paths.reduce(function (sum,p) { return sum + p.points.length; }, 0);
+  els.vectorStats.textContent = paths.length + " putanja · " + pts + " čvorova";
+}
+function currentPaths() { return state.mode === "manual" ? state.manual : state.auto; }
+function setMode(mode) {
+  state.mode = mode;
+  state.picking = false;
+  els.drawingSurface.classList.remove("picking");
+  els.manualControls.hidden = mode !== "manual";
+  els.autoControls.hidden = mode !== "auto";
+  els.manualTab.classList.toggle("active", mode === "manual");
+  els.autoTab.classList.toggle("active", mode === "auto");
+  els.manualTab.setAttribute("aria-selected", String(mode === "manual"));
+  els.autoTab.setAttribute("aria-selected", String(mode === "auto"));
+  state.drawing = null; state.drag = null;
+  render();
+  tell(mode === "manual" ? "Crtaj po slici. Dodirni postojeću putanju za odabir i uređivanje." :
+    "Namjesti postavke i pritisni 'Pronađi vanjske konture'.");
+}
+els.manualTab.addEventListener("click", function () { setMode("manual"); });
+els.autoTab.addEventListener("click", function () { setMode("auto"); });
+
+function fitCanvas() {
+  if (!state.width) return;
+  var viewWidth = Math.max(100, els.viewport.clientWidth - 42);
+  var viewHeight = Math.max(100, els.viewport.clientHeight - 42);
+  var base = Math.min(viewWidth, viewHeight * state.width / state.height);
+  var wide = base * Number(els.zoomSlider.value) / 100;
+  els.artboard.style.width = wide + "px";
+  els.artboard.style.height = (wide * state.height / state.width) + "px";
+  els.zoomLabel.textContent = els.zoomSlider.value + "%";
+  render();
+}
+els.zoomSlider.addEventListener("input", fitCanvas);
+window.addEventListener("resize", fitCanvas);
+
+function loadFile(file) {
+  if (!file) return;
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+    tell("Učitaj PNG, JPG ili WEBP sliku.", "error"); return;
+  }
+  if (file.size > 30 * 1024 * 1024) {
+    tell("Slika je prevelika (maksimalno 30 MB).", "error"); return;
+  }
+  var nextUrl = URL.createObjectURL(file), img = new Image();
+  tell("Učitavam i analiziram sliku…");
+  img.onerror = function () {
+    URL.revokeObjectURL(nextUrl);
+    tell("Sliku nije moguće otvoriti.", "error");
+  };
+  img.onload = function () {
+    try {
+      var iw = img.naturalWidth, ih = img.naturalHeight;
+      if (!iw || !ih) throw Error("Neispravne dimenzije slike.");
+      // Conserve device memory. Dimension reduction is explicit in the status.
+      var factor = Math.min(1, 2500 / Math.max(iw, ih), Math.sqrt(5000000 / (iw * ih)));
+      var w = Math.max(1, Math.round(iw * factor)), h = Math.max(1, Math.round(ih * factor));
+      var c = document.createElement("canvas"); c.width = w; c.height = h;
+      var ctx = c.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw Error("Canvas nije dostupan.");
+      ctx.clearRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+      var pixels = ctx.getImageData(0, 0, w, h);
+      if (state.url) URL.revokeObjectURL(state.url);
+      state.url = nextUrl;
+      state.pixels = pixels; state.width = w; state.height = h;
+      state.manual = []; state.auto = []; state.selection = -1;
+      state.history = []; state.future = []; state.drawing = null;
+      els.sourceImage.src = nextUrl;
+      els.sourceImage.hidden = !els.showOriginal.checked;
+      els.drawingSurface.setAttribute("viewBox", "0 0 " + w + " " + h);
+      els.drawingSurface.setAttribute("preserveAspectRatio", "none");
+      els.artboard.hidden = false; els.emptyStage.hidden = true;
+      els.fileDetails.hidden = false; els.fileName.textContent = file.name;
+      els.dropZone.hidden = true;
+      els.dimensions.textContent = iw + " × " + ih + (factor < 1 ? " · analiza " + w + " × " + h : "");
+      els.zoomSlider.value = "100";
+      els.zoomLabel.textContent = "100%";
+      fitCanvas();
+      setButtons();
+      tell("✓ Logo učitan. " + (factor < 1 ? "Velika slika smanjena je za obradu; original nije promijenjen. " : "") +
+        "Odaberi način praćenja.", "ok");
+    } catch (error) {
+      URL.revokeObjectURL(nextUrl);
+      tell("Učitavanje nije uspjelo: " + error.message, "error");
+    }
+  };
+  img.src = nextUrl;
+}
+els.fileInput.addEventListener("change", function (e) { loadFile(e.target.files[0]); });
+els.replaceImage.addEventListener("click", function () { els.fileInput.click(); });
+["dragenter","dragover"].forEach(function (event) {
+  els.dropZone.addEventListener(event, function (e) { e.preventDefault(); els.dropZone.classList.add("dragover"); });
+});
+["dragleave","drop"].forEach(function (event) {
+  els.dropZone.addEventListener(event, function (e) { e.preventDefault(); els.dropZone.classList.remove("dragover"); });
+});
+els.dropZone.addEventListener("drop", function (e) { loadFile(e.dataTransfer.files[0]); });
+
+function pointFromEvent(e) {
+  var rect = els.drawingSurface.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(state.width, (e.clientX - rect.left) / rect.width * state.width)),
+    y: Math.max(0, Math.min(state.height, (e.clientY - rect.top) / rect.height * state.height))
+  };
+}
+function sameish(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function makeNode(tag, attributes) {
+  var node = document.createElementNS(ns, tag);
+  Object.entries(attributes).forEach(function (entry) { node.setAttribute(entry[0], String(entry[1])); });
+  return node;
+}
+function render() {
+  els.vectors.replaceChildren();
+  els.handles.replaceChildren();
+  if (!state.width) { setButtons(); return; }
+  var paths = currentPaths();
+  var col = els.pathColor.value;
+  var smooth = Number((state.mode === "manual" ? els.manualSmooth : els.autoSmooth).value);
+  var scale = els.artboard.clientWidth / state.width || 1;
+  var displayStroke = Math.min(8, Math.max(1, 2.1 / scale));
+  var isFilled = els.exportStyle.value === "filled";
+  if (state.mode === "auto" && paths.length && isFilled) {
+    // A single even-odd shape keeps holes genuinely hollow.
+    var compound = paths.map(function (p) { return core.pathD(p.points, true, smooth); }).join(" ");
+    els.vectors.appendChild(makeNode("path", { d: compound, fill: col, "fill-rule": "evenodd",
+      stroke: col, "stroke-width": Math.max(0.4, displayStroke * 0.35), "stroke-linejoin": "round" }));
+  } else {
+    paths.forEach(function (p, i) {
+      var d = core.pathD(p.points, p.closed, smooth);
+      var node = makeNode("path", { d: d, fill: isFilled && p.closed ? col : "none",
+        stroke: state.selection === i && state.mode === "manual" ? "#158cff" : col,
+        "stroke-width": displayStroke, "stroke-linecap": "round", "stroke-linejoin": "round",
+        "data-path-index": i, "class": "vector-path" + (state.selection === i && state.mode === "manual" ? " active" : "") });
+      els.vectors.appendChild(node);
+    });
+  }
+  if (state.drawing && state.drawing.length >= 2) {
+    els.vectors.appendChild(makeNode("path", { d: core.pathD(state.drawing, false, smooth),
+      fill: "none", stroke: "#12b5ef", "stroke-width": displayStroke,
+      "stroke-dasharray": (6 / scale) + " " + (3 / scale),
+      "stroke-linecap": "round", "pointer-events": "none" }));
+  }
+  if (state.mode === "manual" && state.selection >= 0 && state.manual[state.selection]) {
+    var radius = Math.min(25, Math.max(1, 8 / scale));
+    state.manual[state.selection].points.forEach(function (p,i) {
+      els.handles.appendChild(makeNode("circle", { cx: p.x, cy: p.y, r: radius,
+        "data-handle-index": i, "class": "handle" + (i === 0 ? " first" : "") }));
+    });
+  }
+  setButtons();
+}
+function startStroke(p) { state.selection = -1; state.drawing = [p]; render(); }
+function extendStroke(p) {
+  if (!state.drawing) return;
+  var last = state.drawing[state.drawing.length - 1];
+  if (sameish(p, last) >= .55) state.drawing.push(p);
+}
+function endStroke() {
+  if (!state.drawing) return;
+  var pts = state.drawing; state.drawing = null;
+  if (pts.length < 2) { render(); return; }
+  var near = pts.length >= 6 && sameish(pts[0], pts[pts.length - 1]) <
+    Math.min(20, Math.max(6, Math.hypot(state.width, state.height) * .008));
+  if (near) pts.pop();
+  pts = core.simplify(pts, Number(els.manualTolerance.value) / 10, near);
+  if (pts.length < (near ? 3 : 2)) { render(); return; }
+  beforeEdit();
+  state.manual.push({ points: pts, closed: near, type: "manual" });
+  state.selection = state.manual.length - 1;
+  tell(near ? "✓ Zatvorena SVG putanja dodana. Možeš urediti svaku točku." :
+    "✓ Potez spremljen kao uređiva SVG putanja. Zatvori ga gumbom ako želiš siluetu.", "ok");
+  render();
+}
+els.drawingSurface.addEventListener("pointerdown", function (e) {
+  if (!state.pixels || e.button !== 0 || state.busy || state.drag || !e.isPrimary) return;
+  e.preventDefault();
+  var p = pointFromEvent(e);
+  if (state.picking) {
+    var ix = Math.min(state.width - 1, Math.floor(p.x)), iy = Math.min(state.height - 1, Math.floor(p.y));
+    var off = (iy * state.width + ix) * 4, d = state.pixels.data;
+    var hex = "#" + [d[off], d[off+1], d[off+2]].map(function (v) { return v.toString(16).padStart(2, "0"); }).join("");
+    els.pathColor.value = hex;
+    state.picking = false; els.drawingSurface.classList.remove("picking");
+    tell("Boja odabrana iz logotipa: " + hex, "ok"); render();
+    return;
+  }
+  if (state.mode !== "manual") return;
+  var handle = e.target.getAttribute("data-handle-index");
+  var idx = e.target.getAttribute("data-path-index");
+  if (handle !== null && state.selection >= 0) {
+    beforeEdit();
+    state.drag = { id: e.pointerId, kind: "handle", index: Number(handle) };
+  } else if (idx !== null) {
+    state.selection = Number(idx);
+    state.drag = { id: e.pointerId, kind: "select" };
+  } else {
+    startStroke(p);
+    state.drag = { id: e.pointerId, kind: "draw" };
+  }
+  els.drawingSurface.setPointerCapture(e.pointerId);
+  render();
+});
+els.drawingSurface.addEventListener("pointermove", function (e) {
+  if (!state.drag || state.drag.id !== e.pointerId) return;
+  e.preventDefault();
+  if (state.drag.kind === "draw") {
+    var events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
+    if (!events.length) events = [e];
+    events.forEach(function (event) { extendStroke(pointFromEvent(event)); });
+    render();
+  } else if (state.drag.kind === "handle" && state.selection >= 0) {
+    state.manual[state.selection].points[state.drag.index] = pointFromEvent(e);
+    render();
+  }
+});
+function finishPointer(e) {
+  if (!state.drag || state.drag.id !== e.pointerId) return;
+  var kind = state.drag.kind; state.drag = null;
+  if (kind === "draw") { if (e.type === "pointerup") extendStroke(pointFromEvent(e)); endStroke(); }
+  else if (kind === "handle") { tell("✓ Vektorski čvor pomaknut.", "ok"); render(); }
+  else render();
+  if (els.drawingSurface.hasPointerCapture(e.pointerId)) els.drawingSurface.releasePointerCapture(e.pointerId);
+}
+els.drawingSurface.addEventListener("pointerup", finishPointer);
+els.drawingSurface.addEventListener("pointercancel", function(e) {
+  if (!state.drag || state.drag.id !== e.pointerId) return;
+  if (state.drag.kind === "draw") state.drawing = null;
+  state.drag = null; render();
+});
+function undo() {
+  if (!state.history.length) return;
+  state.future.push(clonePaths(state.manual));
+  state.manual = state.history.pop(); state.selection = -1;
+  render(); tell("Potez poništen.");
+}
+function redo() {
+  if (!state.future.length) return;
+  state.history.push(clonePaths(state.manual));
+  state.manual = state.future.pop(); state.selection = -1;
+  render(); tell("Potez vraćen.");
+}
+els.undoBtn.addEventListener("click", undo);
+els.redoBtn.addEventListener("click", redo);
+els.closeBtn.addEventListener("click", function () {
+  if (state.selection < 0) return;
+  beforeEdit(); state.manual[state.selection].closed = true; render();
+  tell("✓ Putanja zatvorena. Sada je možeš izvesti kao ispunjeni oblik.", "ok");
+});
+els.deleteBtn.addEventListener("click", function () {
+  if (state.selection < 0) return;
+  beforeEdit(); state.manual.splice(state.selection, 1); state.selection = -1;
+  render(); tell("Odabrana putanja obrisana.");
+});
+els.clearBtn.addEventListener("click", function () {
+  if (!state.manual.length) return;
+  beforeEdit(); state.manual = []; state.selection = -1; render();
+  tell("Ručne putanje očišćene. Možeš ih vratiti tipkom Poništi.");
+});
+window.addEventListener("keydown", function (e) {
+  var tag = document.activeElement && document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+  if (state.mode !== "manual") return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+    e.preventDefault(); if (e.shiftKey) redo(); else undo();
+  }
+  if ((e.key === "Delete" || e.key === "Backspace") && state.selection >= 0) els.deleteBtn.click();
+  if (e.key === "Escape") { state.selection = -1; state.picking = false; render(); }
+});
+els.pickColor.addEventListener("click", function () {
+  state.picking = !state.picking;
+  els.drawingSurface.classList.toggle("picking", state.picking);
+  tell(state.picking ? "Dodirni boju na logotipu koju želiš zadržati." : "Odabir boje isključen.");
+});
+els.showOriginal.addEventListener("change", function () { els.sourceImage.hidden = !els.showOriginal.checked; });
+els.previewBtn.addEventListener("click", function () {
+  els.showOriginal.checked = !els.showOriginal.checked;
+  els.sourceImage.hidden = !els.showOriginal.checked;
+  tell(els.showOriginal.checked ? "Prikazan je izvorni logo ispod vektora." : "Pregled samo SVG putanja (bez originalne slike).");
+});
+els.pathColor.addEventListener("input", render);
+els.exportStyle.addEventListener("change", render);
+function watchSlider(id, out, fn) {
+  els[id].addEventListener("input", function () { els[out].textContent = fn(els[id].value); if (/Smooth$/.test(id)) render(); });
+}
+watchSlider("manualTolerance","manualToleranceValue",function(v) { return (Number(v)/10).toFixed(1).replace(".",",")+" px"; });
+watchSlider("autoTolerance","autoToleranceValue",function(v) { return (Number(v)/10).toFixed(1).replace(".",",")+" px"; });
+watchSlider("manualSmooth","manualSmoothValue",function(v) { return v+"%"; });
+watchSlider("autoSmooth","autoSmoothValue",function(v) { return v+"%"; });
+watchSlider("backgroundTolerance","backgroundToleranceValue",function(v) { return v; });
+watchSlider("alphaThreshold","alphaThresholdValue",function(v) { return v+"%"; });
+
+els.traceBtn.addEventListener("click", async function () {
+  if (!state.pixels || state.busy) return;
+  state.busy = true; setButtons();
+  tell("Tražim rubove, zatvaram konture i uklanjam šum…");
+  try {
+    // Give the browser a chance to paint the progress message.
+    await new Promise(function(resolve) { setTimeout(resolve, 30); });
+    var found = core.contours(state.pixels, state.width, state.height, {
+      bgTolerance: Number(els.backgroundTolerance.value),
+      alphaThreshold: Number(els.alphaThreshold.value),
+      tolerance: Number(els.autoTolerance.value) / 10,
+      includeHoles: els.includeHoles.checked
+    });
+    state.auto = found.paths;
+    if (!state.auto.length) {
+      tell("Nisam pronašao zatvorene konture. Pokušaj drugi prag ili PNG s prozirnom pozadinom.", "error");
+    } else {
+      tell("✓ Pronađeno " + found.paths.length + " vektorskih kontura. " + found.note, "ok");
+    }
+    render();
+  } catch (e) {
+    console.error(e);
+    tell("Automatsko praćenje nije uspjelo: " + e.message, "error");
+  } finally {
+    state.busy = false; setButtons();
+  }
+});
+els.downloadBtn.addEventListener("click", function () {
+  var paths = currentPaths();
+  if (!paths.length) return;
+  var svg = core.exportSVG(paths, state.width, state.height, {
+    color: els.pathColor.value,
+    strokeWidth: els.strokeWidth.value,
+    style: els.exportStyle.value,
+    smooth: Number((state.mode === "manual" ? els.manualSmooth : els.autoSmooth).value)
+  });
+  var blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  var href = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = href; a.download = "logo-" + (state.mode === "manual" ? "rucno" : "kontura") + ".svg";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(href); }, 1000);
+  tell("✓ Čisti SVG preuzet. Datoteka sadrži samo prave vektorske putanje.", "ok");
+});
+setButtons();
+})();
