@@ -8,7 +8,7 @@ function clamp(n,a,b){return Math.min(b,Math.max(a,n));}
 function rgbDist2(a,b){var r=a[0]-b[0],g=a[1]-b[1],bl=a[2]-b[2];return r*r+g*g+bl*bl;}
 function hex(c){return "#"+c.map(function(n){return clamp(Math.round(n),0,255).toString(16).padStart(2,"0");}).join("");}
 function area(p){var a=0;for(var i=0,j=p.length-1;i<p.length;j=i++)a+=p[j].x*p[i].y-p[i].x*p[j].y;return a/2;}
-function paletteFor(mask,pixels,w,h,alpha,maxColors){
+function paletteFor(mask,pixels,w,h,alpha,maxColors,similarity){
   var n=w*h,step=Math.max(1,Math.floor(Math.sqrt(n/28000)));
   var bins=new Map(),samples=[],total=0;
   for(var y=0;y<h;y+=step)for(var x=0;x<w;x+=step){
@@ -30,7 +30,7 @@ function paletteFor(mask,pixels,w,h,alpha,maxColors){
   }
   if(!samples.length)throw Error("Logo nema nijednog vidljivog piksela.");
   var hist=Array.from(bins.values()).sort(function(a,b){return b.count-a.count;});
-  var seeds=[],minSeparation=35;
+  var seeds=[],minSeparation=Math.max(24,similarity*.78);
   // Seed using frequency, not farthest-point outliers (those are usually JPEG noise).
   for(var b of hist){
     if(b.count<Math.max(2,total*.00065))continue;
@@ -73,7 +73,7 @@ function paletteFor(mask,pixels,w,h,alpha,maxColors){
       var d=rgbDist2(e.color,m.color);
       if(d<best){best=d;nearest=m;}
     }
-    if(nearest&&best<30*30){
+    if(nearest&&best<similarity*similarity){
       var t=nearest.n+e.n;
       nearest.color=nearest.color.map(function(v,i){return(v*nearest.n+e.color[i]*e.n)/t;});
       nearest.n=t;
@@ -182,9 +182,9 @@ function FullVector(mask,img,W,H,opts){
   // Primary silhouette is always traced independently of color clustering.
   var shape=toPath(geom.traceIso(coverage,W,H,128),.55);
   if(!shape.paths)throw Error("Nije prepoznata silueta. Pokušaj drugačiji izvorni PNG.");
-  var palette=paletteFor(foreground,pix,W,H,hasAlpha,clamp(Number(opts.maxColors)||12,1,16));
-  var labels=classify(foreground,pix,W,H,palette);
   var strength=clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
+  var palette=paletteFor(foreground,pix,W,H,hasAlpha,clamp(Number(opts.maxColors)||12,1,16),28+strength*.43);
+  var labels=classify(foreground,pix,W,H,palette);
   var passes=strength<10?0:strength<45?1:2;
   if(palette.length>1&&passes)labels=majorityFilter(labels,W,H,passes);
   var minRegion=strength<10?1:Math.max(3,Math.round(Math.min(100,N/90000)*(strength/70)));
