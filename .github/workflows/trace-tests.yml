@@ -17,6 +17,11 @@ on:
   pull_request:
     paths:
       - "trace-core.js"
+      - "trace-fit.js"
+      - "fullvector.js"
+      - "vector.js"
+      - "index.html"
+      - "style.css"
       - "trace-app.js"
       - "trace.html"
       - "trace.css"
