@@ -44,6 +44,30 @@ run.onclick=async()=>{run.disabled=true;status.classList.remove('hidden');status
       maxColors:Number($('#vectorColors').value),
       denoise:Number($('#noiseReduction').value)
     });svgText=b.svg;svgResult.innerHTML=svgText;stats.textContent=`${b.colors.toLocaleString()} stvarnih boja • ${b.paths.toLocaleString()} kontura • ${b.segments.toLocaleString()} stvarnih SVG segmenata • ${b.points.toLocaleString()} analiziranih rubnih točaka • uklonjeno ${b.noiseRemoved.toLocaleString()} šumnih piksela • SVG s Bézierovim krivuljama`;resultCard.classList.remove('hidden');status.textContent='✓ Full vector SVG gotov.';applyZoom();resultCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri full vektorizaciji: '+e.message}finally{run.disabled=false}};
-function applyZoom(){zoomValue.textContent=zoom.value+'%';const s=svgResult.querySelector('svg');if(s){s.style.width=zoom.value+'%';s.style.height='auto';s.style.maxWidth='none'}}zoom.oninput=applyZoom;$('#downloadSvg').onclick=()=>{if(!svgText)return;const u=URL.createObjectURL(new Blob([svgText],{type:'image/svg+xml'})),a=document.createElement('a');a.href=u;a.download='logo-full-vector.svg';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
+function applyZoom(){zoomValue.textContent=zoom.value+'%';const s=svgResult.querySelector('svg');if(s){s.style.width=zoom.value+'%';s.style.height='auto';s.style.maxWidth='none'}}zoom.oninput=applyZoom;function saveFullSVG(){
+  if(!svgText){status.classList.remove('hidden');status.textContent='Prvo izradi SVG.';return}
+  try{
+    const url=URL.createObjectURL(new Blob([svgText],{type:'image/svg+xml;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download='logo-full-vector.svg';
+    a.style.display='none';document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    status.classList.remove('hidden');status.textContent='Preuzimanje je pokrenuto. Provjeri mapu Preuzimanja, ili koristi Spremi / podijeli.';
+  }catch(err){status.classList.remove('hidden');status.textContent='Preuzimanje nije uspjelo: '+err.message}
+}
+$('#downloadSvg').onclick=saveFullSVG;
+$('#shareFullSvg').onclick=async()=>{
+  if(!svgText)return;
+  try{
+    const file=new File([svgText],'logo-full-vector.svg',{type:'image/svg+xml'});
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:'Logo Print Lab SVG'});
+    }else saveFullSVG();
+  }catch(err){
+    if(err.name!=='AbortError'){
+      status.classList.remove('hidden');
+      status.textContent='Dijeljenje nije dostupno: '+err.message+'. Pokušaj Preuzmi SVG u pregledniku.';
+    }
+  }
+};
 $('#vectorColors').addEventListener('input',()=>$('#vectorColorsLabel').textContent=$('#vectorColors').value);
 $('#noiseReduction').addEventListener('input',()=>$('#noiseReductionLabel').textContent=$('#noiseReduction').value+'%');
