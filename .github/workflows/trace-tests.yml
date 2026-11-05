@@ -1,0 +1,31 @@
+name: Trace Studio tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - "trace-core.js"
+      - "trace-app.js"
+      - "trace.html"
+      - "trace.css"
+      - "tests/**"
+      - ".github/workflows/trace-tests.yml"
+  pull_request:
+    paths:
+      - "trace-core.js"
+      - "trace-app.js"
+      - "trace.html"
+      - "trace.css"
+      - "tests/**"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check trace-core.js
+      - run: node --check trace-app.js
+      - run: node --test tests/trace-core.test.cjs
