@@ -7,11 +7,11 @@ Repozitorij s postojećim **Full Vector** alatom i zasebnim **Logo Trace Studio*
 
 ## Logo Trace Studio
 
-**Način 1 / Ručno praćenje:** učitaj PNG, JPG ili WEBP i povlači prstom, mišem ili digitalnom olovkom preko slike. Potezi se bilježe u koordinatama slike, pojednostavljuju algoritmom Ramer–Douglas–Peucker, opcionalno zaglađuju kubnim Bézierovim krivuljama i postaju SVG putanje. Putanju je moguće odabrati, pomaknuti pojedinačne čvorove, zatvoriti, obrisati te poništiti ili vratiti do 40 promjena.
+**Način 1 / Ručno praćenje:** učitaj PNG, JPG ili WEBP i povlači prstom, mišem ili digitalnom olovkom preko slike. Potezi se bilježe u koordinatama slike, pojednostavljuju algoritmom Ramer–Douglas–Peucker, opcionalno zaglađuju kubnim Bézierovim krivuljama i postaju SVG putanje. Putanju je moguće odabrati, pomaknuti pojedinačne čvorove, zatvoriti, obrisati te poništiti ili vratiti do 40 promjena. Opcionalni **magnet uz rub** pri ručnom crtanju blago privlači potez na susjedne prijelaze boje ili prozirnosti.
 
 **Način 2 / Automatska kontura:** vlastiti algoritam koristi prozirnost kad postoji ili određuje referentnu boju pozadine na rubovima i poplavnim ispunjavanjem uklanja samo povezan vanjski dio. Kontura se izvlači s interpolacijom položaja podpikselnih granica (marching squares), spaja u zatvorene putanje i pojednostavljuje. Unutarnje rupe opcionalno se prikazuju uz SVG even-odd ispunu.
 
-**Izvoz:** SVG s vektorskim \`path\` elementima, bez \`image\`, data URI slike ili poziva vanjskom serveru. Konture mogu biti samo linije ili jednobojne ispunjene siluete, uz uzorak boje iz originalnog loga. Za **višebojni** logo i višebojne oblike koristi postojeći Full Vector alat na početnoj stranici. Jednobojna kontura ne može automatski sačuvati sve boje višebojnog logotipa.
+**Izvoz:** SVG s vektorskim `path` elementima, bez `image`, data URI slike ili poziva vanjskom serveru. Konture mogu biti samo linije ili jednobojne ispunjene siluete, uz uzorak boje iz originalnog loga. Za **višebojni** logo i višebojne oblike koristi postojeći Full Vector alat na početnoj stranici. Jednobojna kontura ne može automatski sačuvati sve boje višebojnog logotipa.
 
 ### Preciznost i granice
 
@@ -23,17 +23,17 @@ Repozitorij s postojećim **Full Vector** alatom i zasebnim **Logo Trace Studio*
 
 ### Testovi
 
-\`\`\`bash
+```bash
 node --check trace-core.js
 node --check trace-app.js
 node --test tests/trace-core.test.cjs
-\`\`\`
+```
 
 GitHub Actions pokreće ove provjere nakon relevantnih promjena.
 
 ## Postojeći Full Vector
 
-\`index.html\`, \`vector.js\` i \`fullvector.js\` ostaju dostupni. Puni obojeni SVG generira se zasebno i predstavlja aproksimaciju boja iz rastera, ne matematički savršenu reprodukciju svakog izvornog piksela.
+`index.html`, `vector.js` i `fullvector.js` ostaju dostupni. Puni obojeni SVG generira se zasebno i predstavlja aproksimaciju boja iz rastera, ne matematički savršenu reprodukciju svakog izvornog piksela.
 
 ## Ostali dijelovi repozitorija
 
