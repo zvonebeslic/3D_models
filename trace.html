@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b1020">
   <title>Logo Trace Studio | Logo Print Lab</title>
-  <link rel="stylesheet" href="trace.css?v=ultra2">
+  <link rel="stylesheet" href="trace.css?v=curves3">
 </head>
 <body>
 <main class="shell">
@@ -56,7 +56,7 @@
     </div>
 
     <div class="modecontrols" id="autoControls" hidden>
-      <p>ULTRA DETAIL: prati rubove svih dostupnih piksela i unutarnje otvore, bez automatskog pojednostavljenja ili zaglađivanja. Prozirni PNG daje najvjernije rezultate; obični JPG zahtijeva procjenu pozadine.</p>
+      <p>NOVO: razdvaja prepoznavanje rubova i rekonstrukciju glatkih Bézierovih krivulja uz očuvanje oštrih kutova. Prozirni PNG daje najvjernije rezultate; obični JPG zahtijeva procjenu pozadine.</p>
       <div class="settingrow">
         <label class="control">Sličnost pozadini <output id="backgroundToleranceValue">18</output>
           <input id="backgroundTolerance" type="range" min="1" max="120" value="18" step="2">
@@ -82,6 +82,16 @@
       <small class="hint">Preciznost SVG koordinata: šest decimalnih mjesta (0,000001 px u zapisu). Stvarna točnost ovisi o kvaliteti izvora. Ako previše šuma ulazi u obris, povećaj prag pozadine.</small>
     </div>
 
+    <div class="curvecontrols">
+      <label class="check"><input id="curveFit" type="checkbox" checked> <strong>Prepoznaj glatke krivulje i oštre kutove</strong></label>
+      <label class="control">Dopušteno odstupanje Bézierove krivulje <output id="curveToleranceValue">0,65 px</output>
+        <input id="curveTolerance" type="range" min="20" max="250" step="5" value="65">
+      </label>
+      <label class="control">Uklanjanje nazubljenosti piksela <output id="edgeSoftnessValue">45%</output>
+        <input id="edgeSoftness" type="range" min="0" max="100" step="5" value="45">
+      </label>
+      <small class="hint">Krivulje pokušavaju rekonstruirati oblik loga, dok isključivanje ove opcije prikazuje sirove rubove piksela. Usporedi oba prikaza i odaberi vjerniji.</small>
+    </div>
     <div class="viewtools">
       <label class="check"><input type="checkbox" id="showOriginal" checked> Prikaži original</label>
       <button type="button" id="pickColor" disabled>◉ Uzmi boju iz loga</button>
@@ -121,7 +131,8 @@
   </section>
   <footer>Logo Trace Studio · ULTRA DETAIL · vlastiti algoritam bez vanjskog servisa</footer>
 </main>
-<script src="trace-core.js?v=ultra2"></script>
-<script src="trace-app.js?v=ultra2"></script>
+<script src="trace-core.js?v=curves3"></script>
+<script src="trace-fit.js?v=curves3"></script>
+<script src="trace-app.js?v=curves3"></script>
 </body>
 </html>
