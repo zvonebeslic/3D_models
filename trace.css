@@ -12,3 +12,7 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.
 [hidden]{display:none!important}
 
 .hit-path{cursor:pointer}
+
+.artboard svg.panning,.artboard svg.panning .hit-path{cursor:grab!important}
+.artboard svg.panning:active{cursor:grabbing!important}
+.viewtools button[aria-pressed="true"]{background:#176468;border-color:#4adacb;color:#fff}
