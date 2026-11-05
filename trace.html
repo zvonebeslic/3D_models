@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="hr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>Logo Trace Studio | Logo Print Lab</title>
+  <link rel="stylesheet" href="trace.css">
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <a class="back" href="index.html" aria-label="Natrag na Logo Print Lab">← Full Vector</a>
+    <div><p class="eyebrow">LOGO PRINT LAB / VECTOR ENGINE</p><h1>Logo Trace <em>Studio</em></h1><p class="subtitle">Crtaj preko logotipa ili automatski pronađi njegove vanjske konture.</p></div>
+    <span class="local">● Lokalna obrada</span>
+  </header>
+
+  <section class="panel upload">
+    <div class="panelhead"><h2>01 / Originalni logo</h2><span>PNG · JPG · WEBP</span></div>
+    <label class="uploadbox" id="dropZone" for="fileInput">
+      <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp">
+      <strong>＋ Učitaj logo</strong>
+      <span>Dodirni za odabir ili ovdje povuci datoteku</span>
+    </label>
+    <div class="filedetails" id="fileDetails" hidden><span id="fileName"></span><button id="replaceImage" type="button">Promijeni sliku</button></div>
+  </section>
+
+  <section class="panel workspace">
+    <div class="panelhead"><h2>02 / Radna površina</h2><span id="dimensions">Nema učitane slike</span></div>
+    <div class="tabs" role="tablist" aria-label="Način praćenja">
+      <button id="manualTab" type="button" class="tab active" role="tab" aria-selected="true">✎ Ručno praćenje</button>
+      <button id="autoTab" type="button" class="tab" role="tab" aria-selected="false">◎ Automatska kontura</button>
+    </div>
+
+    <div class="modecontrols" id="manualControls">
+      <p>Prstom, mišem ili olovkom povuci preko rubova. Svaki potez postaje prava SVG putanja.</p>
+      <div class="toolbar">
+        <button type="button" id="undoBtn" disabled>↶ Poništi</button>
+        <button type="button" id="redoBtn" disabled>↷ Vrati</button>
+        <button type="button" id="closeBtn" disabled>◇ Zatvori putanju</button>
+        <button type="button" id="deleteBtn" disabled>✕ Obriši odabrano</button>
+        <button type="button" id="clearBtn" disabled>Očisti sve</button>
+      </div>
+      <div class="settingrow">
+        <label class="control">Preciznost pojednostavljenja <output id="manualToleranceValue">0,8 px</output>
+          <input id="manualTolerance" type="range" min="0" max="30" value="8" step="1">
+        </label>
+        <label class="control">Zaglađivanje <output id="manualSmoothValue">30%</output>
+          <input id="manualSmooth" type="range" min="0" max="100" value="30" step="5">
+        </label>
+      </div>
+      <small class="hint">Nakon crtanja dodirni liniju za odabir. Plave točke možeš povlačiti i precizno mijenjati oblik.</small>
+    </div>
+
+    <div class="modecontrols" id="autoControls" hidden>
+      <p>Vlastiti algoritam čita alfa-kanal ili uklanja pozadinu povezanu s rubovima, zatim pronalazi subpikselne konture.</p>
+      <div class="settingrow">
+        <label class="control">Sličnost pozadini <output id="backgroundToleranceValue">42</output>
+          <input id="backgroundTolerance" type="range" min="10" max="120" value="42" step="2">
+        </label>
+        <label class="control">Prag prozirnosti <output id="alphaThresholdValue">50%</output>
+          <input id="alphaThreshold" type="range" min="1" max="99" value="50" step="1">
+        </label>
+        <label class="control">Preciznost konture <output id="autoToleranceValue">0,8 px</output>
+          <input id="autoTolerance" type="range" min="0" max="30" value="8" step="1">
+        </label>
+        <label class="control">Zaglađivanje <output id="autoSmoothValue">20%</output>
+          <input id="autoSmooth" type="range" min="0" max="100" value="20" step="5">
+        </label>
+      </div>
+      <div class="toolbar">
+        <label class="check"><input id="includeHoles" type="checkbox"> Uključi unutarnje otvore</label>
+        <button type="button" id="traceBtn" class="strong" disabled>◎ Pronađi vanjske konture</button>
+      </div>
+      <small class="hint">Za najbolju preciznost koristi prozirni PNG. Na JPG-u je najbolje imati jednoličnu pozadinu.</small>
+    </div>
+
+    <div class="viewtools">
+      <label class="check"><input type="checkbox" id="showOriginal" checked> Prikaži original</label>
+      <button type="button" id="pickColor" disabled>◉ Uzmi boju iz loga</button>
+      <label class="colorcontrol">Boja vektora <input type="color" id="pathColor" value="#28d6c6"></label>
+      <label class="zoomcontrol">Zum <span id="zoomLabel">100%</span><input id="zoomSlider" type="range" min="25" max="500" value="100" step="25"></label>
+    </div>
+
+    <div class="viewport" id="viewport">
+      <div class="empty" id="emptyStage"><strong>Prostor za precizne poteze</strong><span>Učitaj logo pa odaberi način praćenja</span></div>
+      <div class="artboard" id="artboard" hidden>
+        <img id="sourceImage" alt="Originalni logo za praćenje" draggable="false">
+        <svg id="drawingSurface" xmlns="http://www.w3.org/2000/svg" aria-label="Površina za crtanje i uređivanje vektora">
+          <g id="vectors"></g><g id="handles"></g>
+        </svg>
+      </div>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite">Učitaj logo za početak.</div>
+  </section>
+
+  <section class="panel export">
+    <div class="panelhead"><h2>03 / Izvoz vektora</h2><span id="vectorStats">0 putanja</span></div>
+    <div class="exporttools">
+      <label>Vrsta SVG-a
+        <select id="exportStyle"><option value="outline">Čiste linije / konture</option><option value="filled">Ispunjeni oblici</option></select>
+      </label>
+      <label>Debljina linije <input id="strokeWidth" type="number" min="0.1" max="30" value="2" step="0.5"></label>
+    </div>
+    <div class="toolbar">
+      <button type="button" id="previewBtn" disabled>◐ Pregled samo vektora</button>
+      <button type="button" id="downloadBtn" class="strong" disabled>↓ Preuzmi čisti SVG</button>
+    </div>
+    <p class="note">SVG sadrži stvarne vektorske putanje, bez ugrađene rasterske slike. Za višebojnu vektorizaciju cijelog loga koristi <a href="index.html">Full Vector</a>. Kontura i silueta prikazuju jednu odabranu boju.</p>
+  </section>
+  <footer>Logo Trace Studio · vlastiti algoritam, bez slanja fotografija na server</footer>
+</main>
+<script src="trace-core.js"></script>
+<script src="trace-app.js"></script>
+</body>
+</html>
