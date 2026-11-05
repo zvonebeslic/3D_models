@@ -179,7 +179,9 @@
       }
       if(countNear>matches){matches=countNear;best=a;}
     }
-    var bg=samples[best], tol=Math.max(1,Number(opts.bgTolerance)||42);
+    var bg=Array.isArray(opts.backgroundColor)&&opts.backgroundColor.length===3?
+      opts.backgroundColor.map(function(v){return clamp(Number(v)||0,0,255);}):samples[best];
+    var tol=Math.max(1,Number(opts.bgTolerance)||42);
     // Continuous foreground confidence instead of old binary flood fill.
     // Marching squares interpolates through the threshold at subpixel positions.
     for(var p=0;p<n;p++) {
