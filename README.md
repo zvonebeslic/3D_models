@@ -14,6 +14,13 @@ Novi dodatni prekidač **„Prati i unutarnje granice različitih boja“** doda
 
 U izvozu je preciznost koordinata povećana na šest decimalnih mjesta (korak zapisa 0,000001 u koordinatama slike), ali to **nije** tvrdnja da je geometrijska pogreška od izvornog loga manja od 0,000001 piksela. Točnost određuju rezolucija, antialiasing, kompresija, prozirnost, prag detekcije i geometrija izvornog rastera. Za apsolutno identične krivulje potreban je **izvorni vektorski logo** (SVG, AI, EPS ili PDF s vektorima), a ne rekonstrukcija iz piksela.
 
+
+### Inteligentno uklapanje krivulja i pozadine (studeni 2026.)
+
+Nakon prepoznavanja rubova, aktivirana je neovisna faza **adaptivnog prilagođavanja kubnih Bézierovih krivulja**. Krivulje se prilagođavaju sa zadanim odstupanjem od **0,65 px** u odnosu na izdvojene konture, uz višepikselno prepoznavanje oštrih kutova. To je geometrijska aproksimacija izdvojenog ruba i **nije** garancija podudaranja s nepoznatim izvornim vektorskim logotipom. Korisnik može isključiti opciju *Prepoznaj glatke krivulje i oštre kutove* kako bi usporedio sirove rubove piksela. SVG izvoz koristi istu geometriju kao prikaz.
+
+**Uklanjanje nazubljenosti** primjenjuje blagi filtar na masku (ne na cijelu sliku), uz mogućnost potpunog isključivanja. **Dodirni boju pozadine** omogućuje ručni uzorak RGB boje za PNG/JPEG s neprozirnom podlogom umjesto nepouzdanog automatskog nagađanja iz kutova. Kod slike s transparentnošću već postojeći alfa-kanal ima prednost. Za nepravilne fotografske pozadine, gradijente i sjene i dalje će biti potrebna zasebna segmentacija ili ručna dorada.
+
 ## Logo Trace Studio
 
 **Način 1 / Ručno praćenje:** učitaj PNG, JPG ili WEBP i povlači prstom, mišem ili digitalnom olovkom preko slike. Potezi se bilježe u koordinatama slike, pojednostavljuju algoritmom Ramer–Douglas–Peucker, opcionalno zaglađuju kubnim Bézierovim krivuljama i postaju SVG putanje. Putanju je moguće odabrati, pomaknuti pojedinačne čvorove, zatvoriti, obrisati te poništiti ili vratiti do 40 promjena. Opcionalni **magnet uz rub** pri ručnom crtanju blago privlači potez na susjedne prijelaze boje ili prozirnosti.
@@ -34,8 +41,9 @@ U izvozu je preciznost koordinata povećana na šest decimalnih mjesta (korak za
 
 ```bash
 node --check trace-core.js
+node --check trace-fit.js
 node --check trace-app.js
-node --test tests/trace-core.test.cjs
+node --test tests/*.test.cjs
 ```
 
 GitHub Actions pokreće ove provjere nakon relevantnih promjena.
