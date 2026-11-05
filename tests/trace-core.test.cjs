@@ -88,3 +88,59 @@ test("border-touching transparent artwork traces closed boundary",()=>{
   assert.equal(result.paths.length,1);
   assert.ok(result.paths[0].points.length>=3);
 });
+
+test("ULTRA keeps a one-pixel detail in a large image",()=>{
+  const img=image(1500,30,(x,y)=>x===1001&&y===17?solid:transparent);
+  const result=core.contours(img,1500,30,{...settings,tolerance:0,includeHoles:true});
+  assert.equal(result.paths.length,1);
+  assert.equal(result.paths[0].points.length,4);
+});
+
+test("ULTRA retains every pixel boundary vertex when tolerance is zero",()=>{
+  const img=image(22,22,(x,y)=>x>=3&&x<19&&y>=3&&y<19?solid:transparent);
+  const exact=core.contours(img,22,22,{...settings,tolerance:0,includeHoles:true});
+  const simplified=core.contours(img,22,22,{...settings,tolerance:2,includeHoles:true});
+  assert.ok(exact.paths[0].points.length>simplified.paths[0].points.length);
+});
+
+test("SVG serialization retains six decimal places without raster content",()=>{
+  const svg=core.exportSVG([{points:[{x:.123456789,y:2},{x:.654321123,y:6}],
+    closed:false,type:"manual"}],10,10,
+    {style:"outline",color:"#234567",strokeWidth:.5,smooth:0});
+  assert.match(svg,/0\.123457/);
+  assert.match(svg,/0\.654321/);
+  assert.doesNotMatch(svg,/<image\b|data:image/);
+});
+
+test("ULTRA detects interior high-contrast color boundaries",()=>{
+  const red=[230,30,30,255],blue=[30,30,230,255];
+  const img=image(28,28,(x,y)=>x>=3&&x<25&&y>=3&&y<25?(x<14?red:blue):transparent);
+  const result=core.contours(img,28,28,{...settings,tolerance:0,
+    includeHoles:true,includeColorEdges:true,edgeTolerance:40});
+  assert.ok(result.paths.some(p=>p.type==="auto"));
+  assert.ok(result.paths.some(p=>p.type==="detail"));
+  const svg=core.exportSVG(result.paths,28,28,
+    {style:"filled",color:"#004488",strokeWidth:.5,smooth:0});
+  assert.match(svg,/fill-rule="evenodd"/);
+  assert.match(svg,/fill="none" stroke="#004488"/);
+});
+
+test("opaque color-mask interpolation keeps fractional boundary coordinates",()=>{
+  const white=[255,255,255,255],light=[225,225,225,255],black=[5,5,5,255];
+  const img=image(16,16,(x,y)=>x<4||x>11||y<4||y>11?white:
+    (x===4||x===11||y===4||y===11?light:black));
+  const result=core.contours(img,16,16,{...settings,bgTolerance:18,tolerance:0,includeHoles:true});
+  assert.equal(result.paths.length,1);
+  assert.ok(result.paths[0].points.some(p=>Math.abs(p.x-Math.round(p.x))>.000001));
+});
+
+test("ultra mode is the default and cache-busted scripts are used",()=>{
+  const fs=require("node:fs"), path=require("node:path");
+  const html=fs.readFileSync(path.join(__dirname,"../trace.html"),"utf8");
+  const js=fs.readFileSync(path.join(__dirname,"../trace-app.js"),"utf8");
+  assert.match(html,/id="nativePixels"[^>]*checked/);
+  assert.match(html,/id="autoTolerance"[^>]*value="0"/);
+  assert.match(html,/id="autoSmooth"[^>]*value="0"/);
+  assert.match(html,/trace-core\.js\?v=ultra2/);
+  assert.match(js,/var full = els\.nativePixels\.checked/);
+});
