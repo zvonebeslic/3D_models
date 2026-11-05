@@ -4,7 +4,7 @@
 var $ = function (id) { return document.getElementById(id); };
 var els = {};
 ["fileInput","dropZone","fileDetails","fileName","replaceImage","manualTab","autoTab",
- "manualControls","autoControls","undoBtn","redoBtn","closeBtn","deleteBtn","clearBtn",
+ "manualControls","autoControls","snapEdges","undoBtn","redoBtn","closeBtn","deleteBtn","clearBtn",
  "manualTolerance","manualToleranceValue","manualSmooth","manualSmoothValue",
  "backgroundTolerance","backgroundToleranceValue","alphaThreshold","alphaThresholdValue",
  "autoTolerance","autoToleranceValue","autoSmooth","autoSmoothValue","includeHoles",
@@ -113,6 +113,8 @@ function loadFile(file) {
       if (state.url) URL.revokeObjectURL(state.url);
       state.url = nextUrl;
       state.pixels = pixels; state.width = w; state.height = h;
+      state.hasAlpha = false;
+      for (var ai = 3; ai < pixels.data.length; ai += 4) if (pixels.data[ai] < 250) { state.hasAlpha = true; break; }
       state.manual = []; state.auto = []; state.selection = -1;
       state.history = []; state.future = []; state.drawing = null;
       els.sourceImage.src = nextUrl;
@@ -153,6 +155,39 @@ function pointFromEvent(e) {
     y: Math.max(0, Math.min(state.height, (e.clientY - rect.top) / rect.height * state.height))
   };
 }
+// Optional local edge magnet: follows nearby opacity or RGB transitions.
+function snapPoint(p) {
+  if (!els.snapEdges.checked || !state.pixels) return p;
+  var w = state.width, h = state.height, rgba = state.pixels.data;
+  if (w < 4 || h < 4) return p;
+  var ratio = els.artboard.clientWidth / w || 1;
+  var radius = Math.min(12, Math.max(3, Math.round(3.2 / ratio)));
+  var cx = Math.round(p.x), cy = Math.round(p.y), best = 34, candidate = null;
+  for (var y = Math.max(1, cy - radius); y <= Math.min(h - 2, cy + radius); y++) {
+    for (var x = Math.max(1, cx - radius); x <= Math.min(w - 2, cx + radius); x++) {
+      var dist = Math.hypot(x - p.x, y - p.y);
+      if (dist > radius) continue;
+      var left = (y * w + x - 1) * 4, right = left + 8;
+      var up = ((y - 1) * w + x) * 4, down = up + w * 8;
+      var dx = 0, dy = 0;
+      // Alpha edge is primary for transparent logos; otherwise use RGB gradient.
+      if (state.hasAlpha) {
+        dx = Math.abs(rgba[right + 3] - rgba[left + 3]);
+        dy = Math.abs(rgba[down + 3] - rgba[up + 3]);
+      } else {
+        for (var ch = 0; ch < 3; ch++) {
+          dx += (rgba[right + ch] - rgba[left + ch]) ** 2;
+          dy += (rgba[down + ch] - rgba[up + ch]) ** 2;
+        }
+        dx = Math.sqrt(dx / 3); dy = Math.sqrt(dy / 3);
+      }
+      var strength = Math.hypot(dx, dy);
+      var score = strength - dist * (18 / radius);
+      if (score > best) { best = score; candidate = { x: x + .5, y: y + .5 }; }
+    }
+  }
+  return candidate || p;
+}
 function sameish(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function makeNode(tag, attributes) {
   var node = document.createElementNS(ns, tag);
@@ -182,6 +217,13 @@ function render() {
         "stroke-width": displayStroke, "stroke-linecap": "round", "stroke-linejoin": "round",
         "data-path-index": i, "class": "vector-path" + (state.selection === i && state.mode === "manual" ? " active" : "") });
       els.vectors.appendChild(node);
+      if (state.mode === "manual") {
+        // Invisible 18px-wide touch target makes a thin SVG line selectable on phones.
+        els.vectors.appendChild(makeNode("path", { d: d, fill: "none",
+          stroke: "transparent", "stroke-width": Math.max(displayStroke, 18 / scale),
+          "stroke-linejoin": "round", "stroke-linecap": "round",
+          "pointer-events": "stroke", "data-path-index": i, "class": "hit-path" }));
+      }
     });
   }
   if (state.drawing && state.drawing.length >= 2) {
@@ -199,9 +241,10 @@ function render() {
   }
   setButtons();
 }
-function startStroke(p) { state.selection = -1; state.drawing = [p]; render(); }
+function startStroke(p) { state.selection = -1; state.drawing = [snapPoint(p)]; render(); }
 function extendStroke(p) {
   if (!state.drawing) return;
+  p = snapPoint(p);
   var last = state.drawing[state.drawing.length - 1];
   if (sameish(p, last) >= .55) state.drawing.push(p);
 }
@@ -259,7 +302,7 @@ els.drawingSurface.addEventListener("pointermove", function (e) {
     events.forEach(function (event) { extendStroke(pointFromEvent(event)); });
     render();
   } else if (state.drag.kind === "handle" && state.selection >= 0) {
-    state.manual[state.selection].points[state.drag.index] = pointFromEvent(e);
+    state.manual[state.selection].points[state.drag.index] = snapPoint(pointFromEvent(e));
     render();
   }
 });
