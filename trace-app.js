@@ -8,14 +8,14 @@ var els = {};
  "manualTolerance","manualToleranceValue","manualSmooth","manualSmoothValue",
  "backgroundTolerance","backgroundToleranceValue","alphaThreshold","alphaThresholdValue",
  "autoTolerance","autoToleranceValue","autoSmooth","autoSmoothValue","includeHoles",
- "traceBtn","showOriginal","pickColor","pathColor","zoomSlider","zoomLabel","viewport",
+ "traceBtn","showOriginal","pickColor","panBtn","pathColor","zoomSlider","zoomLabel","viewport",
  "artboard","emptyStage","sourceImage","drawingSurface","vectors","handles",
  "status","dimensions","vectorStats","exportStyle","strokeWidth","previewBtn","downloadBtn"].forEach(function (id) { els[id] = $(id); });
 var ns = "http://www.w3.org/2000/svg";
 var state = {
   url: null, width: 0, height: 0, pixels: null, mode: "manual",
   manual: [], auto: [], selection: -1, drawing: null, drag: null,
-  history: [], future: [], picking: false, busy: false
+  history: [], future: [], picking: false, pan: false, busy: false
 };
 var core = window.TraceCore;
 if (!core) { els.status.textContent = "Greška: modul kontura nije učitan."; return; }
@@ -45,6 +45,7 @@ function setButtons() {
     (state.manual[state.selection] || { points: [] }).points.length < 3;
   els.traceBtn.disabled = !loaded || state.busy;
   els.pickColor.disabled = !loaded;
+  els.panBtn.disabled = !loaded;
   var paths = currentPaths();
   els.downloadBtn.disabled = !paths.length;
   els.previewBtn.disabled = !paths.length;
@@ -55,7 +56,10 @@ function currentPaths() { return state.mode === "manual" ? state.manual : state.
 function setMode(mode) {
   state.mode = mode;
   state.picking = false;
-  els.drawingSurface.classList.remove("picking");
+  state.pan = false;
+  els.panBtn.textContent = "✥ Pomakni prikaz";
+  els.panBtn.setAttribute("aria-pressed", "false");
+  els.drawingSurface.classList.remove("picking", "panning");
   els.manualControls.hidden = mode !== "manual";
   els.autoControls.hidden = mode !== "auto";
   els.manualTab.classList.toggle("active", mode === "manual");
@@ -268,6 +272,12 @@ els.drawingSurface.addEventListener("pointerdown", function (e) {
   if (!state.pixels || e.button !== 0 || state.busy || state.drag || !e.isPrimary) return;
   e.preventDefault();
   var p = pointFromEvent(e);
+  if (state.pan) {
+    state.drag = { id: e.pointerId, kind: "pan", startX: e.clientX, startY: e.clientY,
+      scrollLeft: els.viewport.scrollLeft, scrollTop: els.viewport.scrollTop };
+    els.drawingSurface.setPointerCapture(e.pointerId);
+    return;
+  }
   if (state.picking) {
     var ix = Math.min(state.width - 1, Math.floor(p.x)), iy = Math.min(state.height - 1, Math.floor(p.y));
     var off = (iy * state.width + ix) * 4, d = state.pixels.data;
@@ -296,7 +306,10 @@ els.drawingSurface.addEventListener("pointerdown", function (e) {
 els.drawingSurface.addEventListener("pointermove", function (e) {
   if (!state.drag || state.drag.id !== e.pointerId) return;
   e.preventDefault();
-  if (state.drag.kind === "draw") {
+  if (state.drag.kind === "pan") {
+    els.viewport.scrollLeft = state.drag.scrollLeft - (e.clientX - state.drag.startX);
+    els.viewport.scrollTop = state.drag.scrollTop - (e.clientY - state.drag.startY);
+  } else if (state.drag.kind === "draw") {
     var events = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
     if (!events.length) events = [e];
     events.forEach(function (event) { extendStroke(pointFromEvent(event)); });
@@ -359,8 +372,24 @@ window.addEventListener("keydown", function (e) {
   if ((e.key === "Delete" || e.key === "Backspace") && state.selection >= 0) els.deleteBtn.click();
   if (e.key === "Escape") { state.selection = -1; state.picking = false; render(); }
 });
+els.panBtn.addEventListener("click", function () {
+  state.pan = !state.pan;
+  state.picking = false;
+  els.drawingSurface.classList.remove("picking");
+  els.drawingSurface.classList.toggle("panning", state.pan);
+  els.panBtn.textContent = state.pan ? "✎ Povratak na crtanje" : "✥ Pomakni prikaz";
+  els.panBtn.setAttribute("aria-pressed", String(state.pan));
+  tell(state.pan ? "Povlačenjem po prikazu sada pomičeš sliku, bez crtanja." :
+    "Pomicanje isključeno. Nastavi s praćenjem logotipa.");
+});
 els.pickColor.addEventListener("click", function () {
   state.picking = !state.picking;
+  if (state.picking) {
+    state.pan = false;
+    els.drawingSurface.classList.remove("panning");
+    els.panBtn.textContent = "✥ Pomakni prikaz";
+    els.panBtn.setAttribute("aria-pressed", "false");
+  }
   els.drawingSurface.classList.toggle("picking", state.picking);
   tell(state.picking ? "Dodirni boju na logotipu koju želiš zadržati." : "Odabir boje isključen.");
 });
