@@ -251,23 +251,31 @@
     rings=rings.filter(function(p){return Math.abs(area(p)) >= minArea;});
     rings.sort(function(a,b){return Math.abs(area(b))-Math.abs(area(a));});
     var output=[];
-    var boxes=rings.map(function(ring){
-      var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-      for(var v of ring){minX=Math.min(minX,v.x);minY=Math.min(minY,v.y);maxX=Math.max(maxX,v.x);maxY=Math.max(maxY,v.y);}
-      return {minX,minY,maxX,maxY};
-    });
-    for(var i=0;i<rings.length;i++){
-      var point=rings[i][0],depth=0,box=boxes[i];
-      for(var j=0;j<i;j++){
-        var parent=boxes[j];
-        if(parent.minX>=box.minX||parent.maxX<=box.maxX||
-           parent.minY>=box.minY||parent.maxY<=box.maxY) continue;
-        if(inside(point,rings[j]))depth++;
-      }
-      if(!opts.includeHoles&&depth%2)continue;
-      var tolerance=Math.max(0,Number(opts.tolerance)||0);
-      var vertices=tolerance>0?simplify(rings[i],tolerance,true):rings[i];
+    var tol=Math.max(0,Number(opts.tolerance)||0);
+    function saveRing(i,depth){
+      var vertices=tol>0?simplify(rings[i],tol,true):rings[i];
       if(vertices.length>=3)output.push({points:vertices,closed:true,type:"auto",depth:depth});
+    }
+    if(opts.includeHoles){
+      // Compound even-odd SVG needs all loops, not a costly O(rings²)
+      // containment test. Essential for dense, high-resolution images.
+      for(var i=0;i<rings.length;i++)saveRing(i,0);
+    } else {
+      var boxes=rings.map(function(ring){
+        var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+        for(var v of ring){minX=Math.min(minX,v.x);minY=Math.min(minY,v.y);maxX=Math.max(maxX,v.x);maxY=Math.max(maxY,v.y);}
+        return {minX,minY,maxX,maxY};
+      });
+      for(var i=0;i<rings.length;i++){
+        var point=rings[i][0],depth=0,box=boxes[i];
+        for(var j=0;j<i;j++){
+          var parent=boxes[j];
+          if(parent.minX>=box.minX||parent.maxX<=box.maxX||
+             parent.minY>=box.minY||parent.maxY<=box.maxY)continue;
+          if(inside(point,rings[j]))depth++;
+        }
+        if(depth%2===0)saveRing(i,depth);
+      }
     }
     var detailCount=0;
     if(opts.includeColorEdges) {
