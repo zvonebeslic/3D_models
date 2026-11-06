@@ -91,14 +91,3 @@ Kako bi se zaštitili **stvarni unutarnji otvori**, izvorne zatvorene prozirne p
 
 Zaglađivanje zahtijeva uključeno **ULTRA čišćenje** i primjenjuje se i na granice višebojnih regija. Može blago zaobliti vrlo sitne kutove, zato su zadana 65% i prilagodljivi klizač namjerno kompromis. Nakon promjene postavke potrebno je ponovno kliknuti **FULL VECTOR SVG**. Ne obećava se oporavak geometrije izgubljene zbog kompresije/mutnog originala.
 
-
-## Full Vector v11 · Vjerno originalu
-
-Na početnoj stranici postoji nova, **zadano uključena** opcija **VJERNO ORIGINALU · svaki detalj**. Ona namjerno isključuje zaglađivanje, uklanjanje mrlja, punjenje rupica, topološke promjene i prilagođavanje Bézierovih krivulja. Umjesto toga SVG čuva **svaki izdvojeni rubni čvor iz rastera** u originalnom koordinatnom sustavu, na šest decimalnih mjesta. Time broj stvarnih `L` segmenata može postati velik, što je poželjno kada je primarni cilj očuvanje sitnih oblika. Također se ukida raniji pomoćni SVG stroke od 0,10 px koji je mogao promijeniti vanjske dimenzije oblika.
-
-U načinu očuvanja detalja originalna slika se ne smije tiho smanjivati. Ako ima više od 10 megapiksela, alat prijavljuje ograničenje mobilne obrade umjesto automatskog gubitka rezolucije. Pri prelasku s jednog načina rada na drugi izvorna se slika učitava ponovno.
-
-Paleta boja u vjernom načinu sada pregledava **sve piksele prednjeg plana**, a ne samo uzorkovane pozicije, pa čak i jako rijetka boja može ući u izdvojene regije. Boje se ipak i dalje kvantiziraju u odabrani broj grupa (najviše 16); to nije savršeno očuvanje svakog RGB piksela, nego vektorska rekonstrukcija. Gubitak detalja nastao u izvornom mutnom ili komprimiranom rasteru nije moguće potpuno vratiti.
-
-Isključivanjem opcije `Vjerno originalu` ponovno postaju dostupni prethodni postupci čišćenja, zaglađivanja i prilagodbe krivulja. Novi klizač **Preciznost prilagodbe krivulja** omogućuje od 0,18 do 1,50 piksela tolerancije. Manja tolerancija znači veću vjernost izdvojenom rubu i više Bézierovih segmenata.
-
