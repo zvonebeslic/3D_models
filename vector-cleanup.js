@@ -14,18 +14,16 @@ function walk(binary,w,h,connectivity,visitor){
       var p=queue[head++],x=p%w,y=Math.floor(p/w);
       if(x<left)left=x;if(x>right)right=x;if(y<top)top=y;if(y>bottom)bottom=y;
       if(x===0||y===0||x===w-1||y===h-1)touches=true;
-      function visit(q){
-        if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}
-      }
-      if(x>0)visit(p-1);
-      if(x<w-1)visit(p+1);
-      if(y>0)visit(p-w);
-      if(y<h-1)visit(p+w);
+      var q;
+      if(x>0){q=p-1;if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}}
+      if(x<w-1){q=p+1;if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}}
+      if(y>0){q=p-w;if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}}
+      if(y<h-1){q=p+w;if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}}
       if(connectivity===8){
-        if(x>0&&y>0)visit(p-w-1);
-        if(x<w-1&&y>0)visit(p-w+1);
-        if(x>0&&y<h-1)visit(p+w-1);
-        if(x<w-1&&y<h-1)visit(p+w+1);
+        if(x>0&&y>0){q=p-w-1;if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}}
+        if(x<w-1&&y>0){q=p-w+1;if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}}
+        if(x>0&&y<h-1){q=p+w-1;if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}}
+        if(x<w-1&&y<h-1){q=p+w+1;if(binary[q]&&!seen[q]){seen[q]=1;queue[tail++]=q;}}
       }
     }
     componentCount++;
