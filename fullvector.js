@@ -154,13 +154,18 @@ function removeSmallRegions(labels,w,h,minPixels){
   }
   return{labels:labels,removed:removed};
 }
-function toPath(loops,fitTolerance){
+function toPath(loops,fitTolerance,detailMode){
+  var raw=detailMode==="original";
   var pieces=[],points=0,segments=0;
   for(var loop of loops){
     if(loop.length<3||Math.abs(area(loop))<.40)continue;
-    var d=(root.TraceFit&&root.TraceFit.pathD)?
-      root.TraceFit.pathD(loop,true,fitTolerance):
-      "M"+loop.map(function(p){return p.x.toFixed(3)+" "+p.y.toFixed(3);}).join(" L")+" Z";
+    // Original mode retains every measured vertex. No RDP, spline fit,
+    // smoothing, noise filtering or reduction of actual contour vertices.
+    var d=raw?
+      "M"+loop.map(function(p){return Number(p.x.toFixed(6))+" "+Number(p.y.toFixed(6));}).join(" L")+" Z":
+      (root.TraceFit&&root.TraceFit.pathD)?
+        root.TraceFit.pathD(loop,true,fitTolerance):
+        "M"+loop.map(function(p){return Number(p.x.toFixed(6))+" "+Number(p.y.toFixed(6));}).join(" L")+" Z";
     if(!d)continue;
     pieces.push(d);points+=loop.length;
     segments+=(d.match(/ [LC]/g)||[]).length;
@@ -183,9 +188,11 @@ function FullVector(mask,img,W,H,opts){
 
   // Geometry-first: clean raster topology BEFORE any colors or curve fitting.
   // True large holes, separate accents and thin strokes remain when above thresholds.
-  var islandLimit=opts.minIsland==null?6:Math.max(0,Number(opts.minIsland)||0);
-  var holeLimit=opts.minHole==null?14:Math.max(0,Number(opts.minHole)||0);
-  var cleanupOn=opts.ultraCleanup!==false;
+  var detailMode=opts.detailMode==="original"?"original":"curves";
+  // Fidelity mode is nondestructive regardless of previous UI slider values.
+  var islandLimit=detailMode==="original"?0:(opts.minIsland==null?6:Math.max(0,Number(opts.minIsland)||0));
+  var holeLimit=detailMode==="original"?0:(opts.minHole==null?14:Math.max(0,Number(opts.minHole)||0));
+  var cleanupOn=detailMode==="original"?false:opts.ultraCleanup!==false;
   var cleaned=cleanupOn?cleanup.clean(original,W,H,{
     minIsland:islandLimit,minHole:holeLimit,notchRepair:opts.notchRepair!==false && holeLimit>0
   }):{mask:original,removedIslands:0,filledHoles:0,
@@ -201,16 +208,17 @@ function FullVector(mask,img,W,H,opts){
   // Crop every connected shape locally, optionally interpolate its ORIGINAL
   // coverage field at 2x/3x. Do not upscale an already fitted SVG.
   // Large components safely fall back to 1x rather than exhausting RAM.
-  var zoom=cleanupOn?Math.round(clamp(Number(opts.segmentScale)||2,1,3)):1;
-  var edgeSmoothness=cleanupOn?clamp(opts.edgeSmoothness==null?65:Number(opts.edgeSmoothness),0,100):0;
-  var curveTolerance=.52+edgeSmoothness*.0055;
+  var zoom=detailMode==="original"?1:cleanupOn?Math.round(clamp(Number(opts.segmentScale)||2,1,3)):1;
+  var edgeSmoothness=detailMode==="original"?0:cleanupOn?clamp(opts.edgeSmoothness==null?65:Number(opts.edgeSmoothness),0,100):0;
+  var curveTolerance=opts.curveTolerance==null?(.52+edgeSmoothness*.0055):
+    clamp(Number(opts.curveTolerance),.18,3);
   var main=cleanup.traceComponents(foreground,coverage,W,H,{
     zoom:zoom,maxLocalPixels:2400000,minArea:.25,edgeSmoothness:edgeSmoothness
   });
-  var silhouette=toPath(main.loops,curveTolerance);
+  var silhouette=toPath(main.loops,curveTolerance,detailMode);
   if(!silhouette.paths)throw Error("Nije prepoznata silueta. Pokušaj drugačiji izvorni PNG.");
 
-  var strength=clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
+  var strength=detailMode==="original"?0:clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
   var palette=paletteFor(foreground,pix,W,H,hasAlpha,
     clamp(Number(opts.maxColors)||12,1,16),28+strength*.43);
   var labels=classify(foreground,pix,W,H,palette);
@@ -227,17 +235,18 @@ function FullVector(mask,img,W,H,opts){
   var base=0;
   for(var k=1;k<counts.length;k++)if(counts[k]>counts[base])base=k;
   function shapeTag(d,color){
-    // Tiny paint-under stroke prevents pinhole seams caused by SVG antialiasing
-    // without inserting a raster element or destroying transparent letter holes.
-    return '<path d="'+d+'" fill="'+color+'" fill-rule="evenodd" stroke="'+color+
-      '" stroke-width="0.10" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke fill"/>';
+    // No geometry-expanding stroke in original fidelity mode.
+    var seamStroke=detailMode==="original"?"none":color;
+    return '<path d="'+d+'" fill="'+color+'" fill-rule="evenodd" stroke="'+seamStroke+
+      '" stroke-width="'+(detailMode==="original"?"0":"0.10")+
+      '" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke fill"/>';
   }
   var body=[shapeTag(silhouette.d,hex(palette[base]))];
   var totalPaths=silhouette.paths,totalPoints=silhouette.points,
       totalSegments=silhouette.segments,colors=1,
       components=main.stats.components,refined=main.stats.refined,
       fallback=main.stats.fallback,removedColor=denoised.removed;
-  var minColorArea=opts.minColorArea==null?Math.max(5,Math.round(strength*.14)):
+  var minColorArea=detailMode==="original"?0:opts.minColorArea==null?Math.max(5,Math.round(strength*.14)):
     Math.max(0,Number(opts.minColorArea)||0);
   for(var k=0;k<palette.length;k++){
     if(k===base||counts[k]<minColorArea)continue;
@@ -255,7 +264,7 @@ function FullVector(mask,img,W,H,opts){
     var local=cleanup.traceComponents(region,regionCoverage,W,H,{
       zoom:zoom,maxLocalPixels:1700000,minArea:.25,edgeSmoothness:edgeSmoothness
     });
-    var vector=toPath(local.loops,.60+edgeSmoothness*.0045);
+    var vector=toPath(local.loops,detailMode==="original"?0:(curveTolerance+.08),detailMode);
     if(!vector.paths)continue;
     body.push(shapeTag(vector.d,hex(palette[k])));
     totalPaths+=vector.paths;totalPoints+=vector.points;
@@ -273,7 +282,7 @@ function FullVector(mask,img,W,H,opts){
     microHolesFilled:cleaned.filledHoleCount,
     microHolePixels:cleaned.filledHoles,
     microNotchesRepaired:cleaned.correctedNotches,
-    components:components,refined:refined,fallback:fallback,edgeSmoothness:edgeSmoothness};
+    components:components,refined:refined,fallback:fallback,edgeSmoothness:edgeSmoothness,detailMode:detailMode};
 }
 root.FullVector=FullVector;
 root.FullVectorV5={paletteFor:paletteFor,classify:classify,majorityFilter:majorityFilter,
