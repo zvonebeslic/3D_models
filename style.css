@@ -58,3 +58,14 @@
 .diffZoomRow button{color:#eafffa;background:#214f64;border:1px solid #4c8da1;border-radius:9px;padding:10px 14px;min-height:42px;cursor:pointer}
 .diffGrid .checker{overflow:auto;max-height:370px;justify-content:flex-start;align-items:flex-start}
 .diffGrid .checker canvas{flex-shrink:0}
+
+/* TrueColor modes: all source colors, precise native-pixel SVG */
+.precisionModes{background:linear-gradient(120deg,#123c43,#13283a);border:1px solid #4a9e98;border-radius:13px;padding:15px;margin-bottom:17px}
+.precisionModes>label:first-child{display:block;color:#e7fffa;font-size:14px;margin-bottom:8px}
+.precisionModes select{display:block;width:100%;max-width:100%;min-height:44px;padding:10px 8px;background:#0f2335;color:#fff;border:1px solid #6eaaa9;border-radius:9px;font-size:13px;font-weight:750}
+.precisionModes small{display:block;color:#b8d4da;font-size:12px;line-height:1.55;margin-top:9px}
+.precisionNotice{margin:11px 0 0;color:#d1e4e3;font-size:12px;line-height:1.55}
+.retainBackground{display:flex;align-items:center;gap:9px;font-size:12px;margin-top:16px;color:#c6f2ed}
+.retainBackground input{width:18px;height:18px;accent-color:#36cbb6}
+.retainBackground input:disabled{opacity:.45}
+.preserveHint{margin-top:5px!important;color:#a6bdc8!important}
