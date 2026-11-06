@@ -1,3 +1,19 @@
+
+
+## Aktualno: Full Vector v16 · provjerena glavna vektorizacija + nadogradnje
+
+Nakon korisničkih povratnih informacija vraćen je prethodni pouzdani **FULL VECTOR SVG** s pravim Bézierovim krivuljama kao jedini zadani način vektorizacije. Vrlo veliki TRUECOLOR SVG sastavljen od pikselnih pravokutnika **više nije zadani postupak**, niti zamjenjuje redovni rezultat ili njegove kontrole.
+
+Nadogradnje glavnog postupka:
+- **Pametno prepoznavanje nijansi i vektorski gradijenti** radi na izvornim RGB uzorcima unutar već vektoriziranih regija i generira SVG linearGradient samo ako stvarno smanjuje pogrešku aproksimacije boje. Jednobojni logotipi ostaju jednobojni, a nasumičan JPG šum ne postaje mnoštvo vektorskih oblika.
+- **Preciznost mikroobrisa** je zaseban klizač s tolerancijom prilagodbe Bézierovih krivulja 0,18–1,20 piksela; početna postavka 0,25 piksela. Manja vrijednost omogućuje zadržavanje više izvornih rubnih točaka i sitnih oblika. Glavni prikaz i dalje je kontinuirana SVG geometrija.
+- **Glatkoća rubova** započinje na blažih 15%, kako bi se spriječilo prekomjerno zaobljivanje iz ranijeg izdanja.
+- **Osnovne boje** sada mogu imati do 64 odvojene regije umjesto 16, ali vektorski gradijenti su dodatno, nezavisno nijansiranje unutar regija, ne čisti prikaz svake moguće RGBA vrijednosti.
+- **Izvezi baš svaku nijansu 1:1** je dodatni, eksplicitni gumb poslije normalne vektorizacije. On izrađuje zasebni TRUECOLOR SVG s točno svim dekodiranim vidljivim RGBA pikselima. Datoteka je često mnogo veća, jer su njezini pravokutni oblici izvedeni iz rastera. Ne zamjenjuje glavni SVG s Bézierovim krivuljama.
+- Dosadašnja karta razlika boja i rubova, inspekcija do 800%, PNG izvoz karte i automatsko odabiranje postavki ostaju integrirani.
+
+Izvornu sliku preko 10 MP alat više ne umanjuje neprimjetno, već prijavljuje ograničenje radi zaštite detalja. Usporedba originala i SVG-a govori kolika je pogreška rekonstruiranog prikaza, ne tvrdi da može sa sigurnošću povratiti izvorni vektorski dizajn mutnog JPG-a.
+
 # Logo Print Lab / 3D Models Lab
 
 Repozitorij s postojećim **Full Vector** alatom i zasebnim **Logo Trace Studio** alatom za konture.
