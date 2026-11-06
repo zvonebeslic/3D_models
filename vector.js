@@ -46,6 +46,7 @@ run.onclick=async()=>{run.disabled=true;status.classList.remove('hidden');status
       ultraCleanup:$('#ultraCleanup').checked,
       minIsland:Number($('#minIsland').value),
       minHole:Number($('#minHole').value),
+      edgeSmoothness:Number($('#edgeSmoothness').value),
       segmentScale:Number($('#segmentScale').value)
     });svgText=b.svg;svgResult.innerHTML=svgText;stats.textContent=`${b.colors.toLocaleString()} stvarnih boja • ${b.paths.toLocaleString()} kontura • ${b.segments.toLocaleString()} stvarnih SVG segmenata • ${b.points.toLocaleString()} analiziranih rubnih točaka • ${b.microIslandsRemoved} uklonjenih mrlja • ${b.microHolesFilled} zatvorenih rupica • ${b.microNotchesRepaired} popravljenih mikroudubljenja • ${b.refined} segmenata lokalno obrađeno u visokoj rezoluciji • ${b.fallback} velikih segmenata obrađeno 1× • SVG s Bézierovim krivuljama`;resultCard.classList.remove('hidden');status.textContent='✓ Full vector SVG gotov.';applyZoom();resultCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri full vektorizaciji: '+e.message}finally{run.disabled=false}};
 function applyZoom(){zoomValue.textContent=zoom.value+'%';const s=svgResult.querySelector('svg');if(s){s.style.width=zoom.value+'%';s.style.height='auto';s.style.maxWidth='none'}}zoom.oninput=applyZoom;function saveFullSVG(){
@@ -80,9 +81,12 @@ function syncCleanupOptions(){
   const on=$('#ultraCleanup').checked;
   $('#minIsland').disabled=!on;
   $('#minHole').disabled=!on;
+  $('#edgeSmoothness').disabled=!on;
   $('#segmentScale').disabled=!on;
 }
 $('#ultraCleanup').addEventListener('change',syncCleanupOptions);
 $('#minIsland').addEventListener('input',()=>$('#minIslandLabel').textContent=$('#minIsland').value+' px²');
 $('#minHole').addEventListener('input',()=>$('#minHoleLabel').textContent=$('#minHole').value+' px²');
 syncCleanupOptions();
+
+$('#edgeSmoothness').addEventListener('input',()=>$('#edgeSmoothnessLabel').textContent=$('#edgeSmoothness').value+'%');
