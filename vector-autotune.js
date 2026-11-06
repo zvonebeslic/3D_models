@@ -10,12 +10,10 @@ function candidateSettings(base){
        island=clamp(Math.round(Number(base.minIsland)||0),0,80),
        hole=clamp(Math.round(Number(base.minHole)||0),0,80),
        colors=clamp(Math.round(Number(base.maxColors)||12),1,16);
- const baseSet={...base,mode:"curves",denoise:den,edgeSmoothness:smooth,minIsland:island,
+ const baseSet={...base,denoise:den,edgeSmoothness:smooth,minIsland:island,
    minHole:hole,maxColors:colors,segmentScale:2};
  const cases=[
-   {name:"TRUECOLOR 1:1 · sve RGBA nijanse",settings:{...baseSet,mode:"exact"}},
-   {name:"TRUECOLOR MICRO · precizni rubovi",settings:{...baseSet,mode:"micro"}},
-   {name:"Klasične trenutačne postavke",settings:baseSet},
+   {name:"Trenutačne postavke",settings:baseSet},
    {name:"Maksimalni detalji",settings:{...baseSet,ultraCleanup:true,
      denoise:0,edgeSmoothness:0,minIsland:0,minHole:0,maxColors:16}},
    {name:"Nježne krivulje",settings:{...baseSet,ultraCleanup:true,
@@ -32,7 +30,7 @@ function candidateSettings(base){
  // Do not score the same parameter set twice.
  const keys=new Set();
  return cases.filter(c=>{
-   const key=JSON.stringify([c.settings.mode,c.settings.ultraCleanup,c.settings.denoise,
+   const key=JSON.stringify([c.settings.ultraCleanup,c.settings.denoise,
      c.settings.edgeSmoothness,c.settings.minIsland,c.settings.minHole,c.settings.maxColors]);
    if(keys.has(key))return false;keys.add(key);return true;
  });
@@ -43,17 +41,16 @@ function maskedDownsample(source,w,h,maxPixels){
   const dims=D.chooseDimensions(w,h,maxPixels);
   const image=D._test.resizeReference(source,w,h,dims.width,dims.height);
   const mask=new Uint8Array(dims.width*dims.height);
-  for(let i=0;i<mask.length;i++)mask[i]=image.data[i*4+3]>0?1:0;
+  for(let i=0;i<mask.length;i++)mask[i]=image.data[i*4+3]>=24?1:0;
   return{img:image,mask,width:dims.width,height:dims.height};
 }
 async function run(source,w,h,base,opts){
  opts=opts||{};
- const compare=root.VectorDiff,curves=root.FullVector,truecolor=root.TrueColorVector;
- if(!compare||typeof curves!=="function"||typeof truecolor!=="function")
-   throw Error("Moduli za automatsko podešavanje nisu učitani.");
+ const compare=root.VectorDiff,vector=root.FullVector;
+ if(!compare||typeof vector!=="function")throw Error("Moduli za automatsko podešavanje nisu učitani.");
  if(!source||!source.data||source.data.length!==w*h*4)
    throw Error("Izvorna slika i dimenzije nisu usklađene.");
- const preview=maskedDownsample(source,w,h,opts.maxPixels||80000);
+ const preview=maskedDownsample(source,w,h,opts.maxPixels||180000);
  const configurations=candidateSettings(base);
  const results=[];
  for(let j=0;j<configurations.length;j++){
@@ -63,13 +60,7 @@ async function run(source,w,h,base,opts){
    // Permit progress to paint before each CPU-heavy synchronous vectorization.
    await new Promise(resolve=>setTimeout(resolve,12));
    try{
-     const isTrueColor=current.settings.mode!=="curves";
-     const b=isTrueColor?
-       truecolor(preview.mask,preview.img,preview.width,preview.height,{
-         mode:current.settings.mode,microScale:2,
-         maxShapes:200000,maxChars:20000000
-       }):
-       curves(preview.mask,preview.img,preview.width,preview.height,current.settings);
+     const b=vector(preview.mask,preview.img,preview.width,preview.height,current.settings);
      const result=await compare._test.rasterizeSVG(b.svg,preview.width,preview.height);
      const stats=compare.compareData(preview.img,result.imageData,preview.width,preview.height,{
        threshold:opts.threshold||12,edgeTolerance:opts.edgeTolerance==null?1:opts.edgeTolerance
