@@ -162,6 +162,28 @@ function drawComparedCanvas(id,source,overlay){
   ctx.drawImage(source,0,0);
   if(overlay)ctx.drawImage(overlay,0,0);
 }
+function updateDiffZoom(){
+  const percent=Number($('#diffZoom').value);
+  $('#diffZoomLabel').textContent=percent+'%';
+  for(const id of ['#originalDiffPreview','#svgDiffPreview','#colorDiffPreview','#edgeDiffPreview']){
+    const canvas=$(id);
+    canvas.style.width=percent+'%';
+    canvas.style.maxWidth='none';
+    canvas.style.maxHeight='none';
+  }
+}
+$('#diffZoom').addEventListener('input',updateDiffZoom);
+$('#downloadDiffPng').onclick=()=>{
+  const canvas=$('#edgeDiffPreview');
+  if(!canvas.width||!canvas.height)return;
+  canvas.toBlob(blob=>{
+    if(!blob){qualityProgress.textContent='Preuzimanje karte nije uspjelo.';return;}
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='logo-odstupanja-rubova.png';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  },'image/png');
+};
 function fmtQuality(value,digits=2){
   return Number(value).toLocaleString('hr-HR',{
     maximumFractionDigits:digits,minimumFractionDigits:digits
@@ -193,6 +215,7 @@ async function compareCurrent(){
   drawComparedCanvas('#colorDiffPreview',result.sourceCanvas,result.heatmapCanvas);
   drawComparedCanvas('#edgeDiffPreview',result.sourceCanvas,result.edgeCanvas);
   diffPanel.classList.remove('hidden');
+  updateDiffZoom();
   return result;
 }
 let qualityBusy=false;
