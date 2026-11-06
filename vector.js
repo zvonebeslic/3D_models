@@ -72,6 +72,7 @@ function setVectorOptions(settings){
     $('#vectorMode').value=settings.mode;
     if(previous!==settings.mode){imgData=null;mask=null;}
   }
+  $('#microScale').value=String(settings.microScale||2);
   $('#vectorColors').value=String(settings.maxColors);
   $('#noiseReduction').value=String(settings.denoise);
   $('#ultraCleanup').checked=Boolean(settings.ultraCleanup);
