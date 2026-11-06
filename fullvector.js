@@ -169,48 +169,109 @@ function toPath(loops,fitTolerance){
 }
 function FullVector(mask,img,W,H,opts){
   opts=opts||{};
-  var N=W*H,pix=img.data,geom=root.TraceCore&&root.TraceCore._test;
-  if(!geom||!geom.traceIso)throw Error("Nedostaje modul za precizne konture (trace-core.js).");
+  var N=W*H,pix=img.data,geom=root.TraceCore&&root.TraceCore._test,cleanup=root.VectorCleanup;
+  if(!geom||!geom.traceIso||!cleanup)throw Error("Moduli za precizne konture nisu učitani.");
   if(!mask||mask.length!==N||!pix||pix.length!==N*4)throw Error("Neispravan ulaz slike.");
   if(N>10500000)throw Error("Slika je prevelika za mobilnu vektorizaciju. Najviše 10,5 megapiksela.");
-  var foreground=new Uint8Array(N),coverage=new Uint8Array(N),hasAlpha=false,visible=0;
+  var original=new Uint8Array(N),hasAlpha=false,visible=0;
   for(var n=0;n<N;n++){
-    var a=pix[n*4+3];if(a<250)hasAlpha=true;
-    if(mask[n]&&a>=24){foreground[n]=1;visible++;}
+    var a=pix[n*4+3];
+    if(a<250)hasAlpha=true;
+    if(mask[n]&&a>=24){original[n]=1;visible++;}
   }
   if(!visible)throw Error("Nisam pronašao vidljiv logo. Provjeri uklanjanje pozadine.");
-  for(var n=0;n<N;n++)coverage[n]=foreground[n]?(hasAlpha?pix[n*4+3]:255):0;
-  // Primary silhouette is always traced independently of color clustering.
-  var shape=toPath(geom.traceIso(coverage,W,H,128),.55);
-  if(!shape.paths)throw Error("Nije prepoznata silueta. Pokušaj drugačiji izvorni PNG.");
+
+  // Geometry-first: clean raster topology BEFORE any colors or curve fitting.
+  // True large holes, separate accents and thin strokes remain when above thresholds.
+  var islandLimit=opts.minIsland==null?6:Math.max(0,Number(opts.minIsland)||0);
+  var holeLimit=opts.minHole==null?14:Math.max(0,Number(opts.minHole)||0);
+  var cleanupOn=opts.ultraCleanup!==false;
+  var cleaned=cleanupOn?cleanup.clean(original,W,H,{
+    minIsland:islandLimit,minHole:holeLimit,notchRepair:opts.notchRepair!==false
+  }):{mask:original,removedIslands:0,filledHoles:0,
+      removedIslandCount:0,filledHoleCount:0,correctedNotches:0};
+  var foreground=cleaned.mask,coverage=new Uint8Array(N);
+  for(var i=0;i<N;i++){
+    if(!foreground[i])continue;
+    var a=pix[i*4+3];
+    // For filled transparent pinholes, the new shape must be opaque.
+    coverage[i]=hasAlpha?(original[i]&&a>=24?a:255):255;
+  }
+
+  // Crop every connected shape locally, optionally interpolate its ORIGINAL
+  // coverage field at 2x/3x. Do not upscale an already fitted SVG.
+  // Large components safely fall back to 1x rather than exhausting RAM.
+  var zoom=cleanupOn?Math.round(clamp(Number(opts.segmentScale)||2,1,3)):1;
+  var main=cleanup.traceComponents(foreground,coverage,W,H,{
+    zoom:zoom,maxLocalPixels:2400000,minArea:.25
+  });
+  var silhouette=toPath(main.loops,.52);
+  if(!silhouette.paths)throw Error("Nije prepoznata silueta. Pokušaj drugačiji izvorni PNG.");
+
   var strength=clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
-  var palette=paletteFor(foreground,pix,W,H,hasAlpha,clamp(Number(opts.maxColors)||12,1,16),28+strength*.43);
+  var palette=paletteFor(foreground,pix,W,H,hasAlpha,
+    clamp(Number(opts.maxColors)||12,1,16),28+strength*.43);
   var labels=classify(foreground,pix,W,H,palette);
   var passes=strength<10?0:strength<45?1:2;
   if(palette.length>1&&passes)labels=majorityFilter(labels,W,H,passes);
   var minRegion=strength<10?1:Math.max(3,Math.round(Math.min(100,N/90000)*(strength/70)));
-  var cleaned=palette.length>1?removeSmallRegions(labels,W,H,minRegion):{labels:labels,removed:0};
-  labels=cleaned.labels;
-  // Recompute actual area to choose the BASE layer correctly.
+  var denoised=palette.length>1?removeSmallRegions(labels,W,H,minRegion):{labels:labels,removed:0};
+  labels=denoised.labels;
+
+  // The dominant color fills the single unified silhouette. Other colors
+  // are traced as coherent regions and painted above it. No pixel confetti.
   var counts=new Int32Array(palette.length);
   for(var n=0;n<N;n++)if(labels[n]!==255)counts[labels[n]]++;
   var base=0;
   for(var k=1;k<counts.length;k++)if(counts[k]>counts[base])base=k;
-  var body=['<path d="'+shape.d+'" fill="'+hex(palette[base])+'" fill-rule="evenodd"/>'];
-  var totalPaths=shape.paths,totalPoints=shape.points,totalSegments=shape.segments,colors=1;
+  function shapeTag(d,color){
+    // Tiny paint-under stroke prevents pinhole seams caused by SVG antialiasing
+    // without inserting a raster element or destroying transparent letter holes.
+    return '<path d="'+d+'" fill="'+color+'" fill-rule="evenodd" stroke="'+color+
+      '" stroke-width="0.10" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke fill"/>';
+  }
+  var body=[shapeTag(silhouette.d,hex(palette[base]))];
+  var totalPaths=silhouette.paths,totalPoints=silhouette.points,
+      totalSegments=silhouette.segments,colors=1,
+      components=main.stats.components,refined=main.stats.refined,
+      fallback=main.stats.fallback,removedColor=denoised.removed;
+  var minColorArea=opts.minColorArea==null?Math.max(5,Math.round(strength*.14)):
+    Math.max(0,Number(opts.minColorArea)||0);
   for(var k=0;k<palette.length;k++){
-    if(k===base||counts[k]<minRegion)continue;
+    if(k===base||counts[k]<minColorArea)continue;
     var region=new Uint8Array(N);
-    for(var i=0;i<N;i++)if(labels[i]===k)region[i]=255;
-    var vector=toPath(geom.traceIso(region,W,H,128),.7);
+    for(var i=0;i<N;i++)if(labels[i]===k)region[i]=1;
+    if(cleanupOn&&minColorArea>1){
+      var regionClean=cleanup.clean(region,W,H,{
+        minIsland:minColorArea,minHole:0,notchRepair:false
+      });
+      region=regionClean.mask;
+      removedColor+=regionClean.removedIslands;
+    }
+    var regionCoverage=new Uint8Array(N);
+    for(var i=0;i<N;i++)if(region[i])regionCoverage[i]=255;
+    var local=cleanup.traceComponents(region,regionCoverage,W,H,{
+      zoom:zoom,maxLocalPixels:1700000,minArea:.25
+    });
+    var vector=toPath(local.loops,.60);
     if(!vector.paths)continue;
-    body.push('<path d="'+vector.d+'" fill="'+hex(palette[k])+'" fill-rule="evenodd"/>');
-    totalPaths+=vector.paths;totalPoints+=vector.points;totalSegments+=vector.segments;colors++;
+    body.push(shapeTag(vector.d,hex(palette[k])));
+    totalPaths+=vector.paths;totalPoints+=vector.points;
+    totalSegments+=vector.segments;colors++;
+    components+=local.stats.components;
+    refined+=local.stats.refined;
+    fallback+=local.stats.fallback;
   }
   var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+
     '" viewBox="0 0 '+W+' '+H+'" shape-rendering="geometricPrecision">'+body.join("")+'</svg>';
-  return{svg:svg,colors:colors,paths:totalPaths,points:totalPoints,segments:totalSegments,noiseRemoved:cleaned.removed,
-    baseColor:hex(palette[base]),sourceColors:palette.length,hasAlpha:hasAlpha};
+  return{svg:svg,colors:colors,paths:totalPaths,points:totalPoints,
+    segments:totalSegments,noiseRemoved:removedColor+cleaned.removedIslands,
+    baseColor:hex(palette[base]),sourceColors:palette.length,hasAlpha:hasAlpha,
+    microIslandsRemoved:cleaned.removedIslandCount,
+    microHolesFilled:cleaned.filledHoleCount,
+    microHolePixels:cleaned.filledHoles,
+    microNotchesRepaired:cleaned.correctedNotches,
+    components:components,refined:refined,fallback:fallback};
 }
 root.FullVector=FullVector;
 root.FullVectorV5={paletteFor:paletteFor,classify:classify,majorityFilter:majorityFilter,
