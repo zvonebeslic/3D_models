@@ -83,6 +83,6 @@ test("palette/noise controls are wired to the home-page Full Vector action",()=>
   assert.match(html,/id="vectorColors"/);
   assert.match(html,/id="noiseReduction"/);
   assert.match(html,/fullvector\.js\?v=vector13/);
-  assert.match(controller,/window\.FullVector\(mask,imgData,W,H,\{/);
+  assert.match(controller,/window\.FullVector\(mask,imgData,W,H,currentVectorOptions\(\)\)/);
   assert.match(controller,/confidence\[n\]<112/);
 });
