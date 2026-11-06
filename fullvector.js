@@ -187,7 +187,7 @@ function FullVector(mask,img,W,H,opts){
   var holeLimit=opts.minHole==null?14:Math.max(0,Number(opts.minHole)||0);
   var cleanupOn=opts.ultraCleanup!==false;
   var cleaned=cleanupOn?cleanup.clean(original,W,H,{
-    minIsland:islandLimit,minHole:holeLimit,notchRepair:opts.notchRepair!==false
+    minIsland:islandLimit,minHole:holeLimit,notchRepair:opts.notchRepair!==false && holeLimit>0
   }):{mask:original,removedIslands:0,filledHoles:0,
       removedIslandCount:0,filledHoleCount:0,correctedNotches:0};
   var foreground=cleaned.mask,coverage=new Uint8Array(N);
