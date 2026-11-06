@@ -82,3 +82,12 @@ Novi modul `vector-cleanup.js` najprije analizira povezane površine, uklanja od
 Svaki povezani segment se lokalno izdvaja iz očišćene maske, zajedno s pripadnom izvornom prozirnošću, a njegova se kontura može ponovno računati na interpoliranom 1×/2×/3× polju. Koordinate se zatim vraćaju u originalni sustav: **nema šavova između umjetnih pločica**. Za velike segmente sustav se automatski vraća na 1× radi memorije. Interpolacija ne stvara novu izvornu informaciju niti jamči geometrijsku točnost od 0,000001 px.
 
 Korisnik može postaviti prag površine za uklanjanje odvojenih mrlja i zatvaranje minijaturnih rupa, kao i potpuno isključiti ULTRA čišćenje, kako bi zaštitio namjerno sitne elemente slova, interpunkcije i logotipa. Veliki otvori i oblici različitih boja imaju regresijske testove. SVG površine imaju vrlo tanku ispunu ruba iste boje (0,10 px) kako bi se smanjile anti-aliasing pukotine u preglednicima bez ugrađenog rastera.
+
+## Full Vector v10 · pametno zaglađivanje nazubljenih rubova
+
+Na početnoj stranici dodana je zasebna kontrola **Glatkoća rubova** (0–100%, zadano 65%). Prije skaliranja pojedinog segmenta i prije uklapanja Bézierovih krivulja obradi se njegova izvorna maska/prozirnost razdvojivim Gaussovim filtrom. Tako se ublažavaju kratke izbočine i rasterizacijske stepenice bez nametanja zamućenja cijeloj slici. Puna rezolucija i SVG koordinatni sustav ostaju nepromijenjeni. Potpuno **0%** isključuje novi filtar.
+
+Kako bi se zaštitili **stvarni unutarnji otvori**, izvorne zatvorene prozirne površine nakon zaglađivanja ponovno se postavljaju na prozirnu vrijednost prije nalaženja konture. Pragovi za čišćenje malih rupa iz prethodne verzije i dalje su zasebne postavke: ako je prag rupa postavljen na nulu, ni jednopikselni unutarnji otvor neće biti automatski izbrisan.
+
+Zaglađivanje zahtijeva uključeno **ULTRA čišćenje** i primjenjuje se i na granice višebojnih regija. Može blago zaobliti vrlo sitne kutove, zato su zadana 65% i prilagodljivi klizač namjerno kompromis. Nakon promjene postavke potrebno je ponovno kliknuti **FULL VECTOR SVG**. Ne obećava se oporavak geometrije izgubljene zbog kompresije/mutnog originala.
+
