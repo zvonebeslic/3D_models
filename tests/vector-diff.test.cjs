@@ -90,3 +90,12 @@ test("homepage loads both modules and visible analysis controls",()=>{
  assert.match(js,/window\.VectorAutotune\.run\(/);
  assert.match(js,/function getVectorReference\(/);
 });
+
+test("edge comparison detects moved internal red-blue color boundaries",()=>{
+ const r=[245,15,20,255],b=[15,20,240,255],outside=[0,0,0,0];
+ const original=image(36,20,(x,y)=>x>=3&&x<33&&y>=2&&y<18?(x<18?r:b):outside);
+ const shifted=image(36,20,(x,y)=>x>=3&&x<33&&y>=2&&y<18?(x<22?r:b):outside);
+ const m=D.compareData(original,shifted,36,20,{threshold:8,edgeTolerance:0});
+ assert.ok(m.edgeMismatchPercent>0,"internal high-contrast color edge must be compared");
+ assert.ok(m.differentPixels>0);
+});
