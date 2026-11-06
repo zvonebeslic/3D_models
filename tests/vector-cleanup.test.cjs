@@ -124,7 +124,7 @@ test("homepage wires all segmentation sliders and imports the cleanup module",()
   const controller=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
   for(const id of ["ultraCleanup","minIsland","minHole","segmentScale"])
     assert.match(html,new RegExp('id="'+id+'"'));
-  assert.match(html,/vector-cleanup\.js\?v=vector10/);
+  assert.match(html,/vector-cleanup\.js\?v=vector11/);
   assert.match(controller,/ultraCleanup:\$\('#ultraCleanup'\)\.checked/);
 });
 
