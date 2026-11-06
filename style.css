@@ -6,3 +6,11 @@
 .optGrid label{color:#c7d7e9;font-weight:600;font-size:13px}
 .optGrid output{color:#7ee8dc;float:right}.optGrid input{width:100%;display:block;accent-color:#28d6c6;margin-top:13px}
 @media(max-width:650px){.optGrid{grid-template-columns:1fr;gap:14px}}
+
+.cleanupConfig{margin-top:16px;padding-top:15px;border-top:1px solid #39566a}
+.cleanupToggle{display:flex;gap:10px;align-items:center;color:#dffef8;font-weight:750;font-size:14px}
+.cleanupToggle input{accent-color:#2bd9c7;width:18px;height:18px}
+.cleanupConfig>small{display:block;color:#a6b9d1;margin-top:9px;font-size:12px;line-height:1.5}
+.segmentScaleLabel{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;font-size:13px;color:#cbdcf1;font-weight:650}
+.segmentScaleLabel select{min-width:205px;max-width:100%;color:white;background:#182a3e;border:1px solid #5c6f82;border-radius:9px;padding:10px}
+.cleanupConfig input:disabled,.cleanupConfig select:disabled{opacity:.35}
