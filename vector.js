@@ -42,13 +42,15 @@ function applyMask(){const d=new ImageData(new Uint8ClampedArray(imgData.data),W
 removeBg.onclick=async()=>{removeBg.disabled=true;status.classList.remove('hidden');status.textContent='Analiziram vanjsku pozadinu i čuvam zatvorene detalje loga…';try{await prepare();bgCard.classList.remove('hidden');status.textContent='✓ Pozadina uklonjena.';bgCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri uklanjanju pozadine.'}finally{removeBg.disabled=false}};$('#downloadPng').onclick=()=>bgCanvas.toBlob(b=>{if(!b)return;const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='logo-transparent.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)});
 run.onclick=async()=>{run.disabled=true;status.classList.remove('hidden');status.textContent='Gradim puni SVG iz boja i oblika…';try{if(!imgData||!mask)await prepare();if(typeof window.FullVector!=='function')throw Error('Full vector engine nije učitan');await new Promise(r=>setTimeout(r,40));const b=window.FullVector(mask,imgData,W,H,{
       maxColors:Number($('#vectorColors').value),
+      detailMode:$('#keepAllDetail').checked?'original':'curves',
+      curveTolerance:Number($('#curveTolerance').value)/100,
       denoise:Number($('#noiseReduction').value),
       ultraCleanup:$('#ultraCleanup').checked,
       minIsland:Number($('#minIsland').value),
       minHole:Number($('#minHole').value),
       edgeSmoothness:Number($('#edgeSmoothness').value),
       segmentScale:Number($('#segmentScale').value)
-    });svgText=b.svg;svgResult.innerHTML=svgText;stats.textContent=`${b.colors.toLocaleString()} stvarnih boja • ${b.paths.toLocaleString()} kontura • ${b.segments.toLocaleString()} stvarnih SVG segmenata • ${b.points.toLocaleString()} analiziranih rubnih točaka • ${b.microIslandsRemoved} uklonjenih mrlja • ${b.microHolesFilled} zatvorenih rupica • ${b.microNotchesRepaired} popravljenih mikroudubljenja • ${b.refined} segmenata lokalno obrađeno u visokoj rezoluciji • ${b.fallback} velikih segmenata obrađeno 1× • SVG s Bézierovim krivuljama`;resultCard.classList.remove('hidden');status.textContent='✓ Full vector SVG gotov.';applyZoom();resultCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri full vektorizaciji: '+e.message}finally{run.disabled=false}};
+    });svgText=b.svg;svgResult.innerHTML=svgText;stats.textContent=`${b.detailMode==='original'?'VJERNO ORIGINALU, svi rubni čvorovi':'Precizne Bézierove krivulje'} • ${b.colors.toLocaleString()} stvarnih boja • ${b.paths.toLocaleString()} kontura • ${b.segments.toLocaleString()} stvarnih SVG segmenata • ${b.points.toLocaleString()} analiziranih rubnih točaka • ${b.microIslandsRemoved} uklonjenih mrlja • ${b.microHolesFilled} zatvorenih rupica • ${b.microNotchesRepaired} popravljenih mikroudubljenja • ${b.refined} segmenata lokalno obrađeno u visokoj rezoluciji • ${b.fallback} velikih segmenata obrađeno 1× • SVG s Bézierovim krivuljama`;resultCard.classList.remove('hidden');status.textContent='✓ Full vector SVG gotov.';applyZoom();resultCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri full vektorizaciji: '+e.message}finally{run.disabled=false}};
 function applyZoom(){zoomValue.textContent=zoom.value+'%';const s=svgResult.querySelector('svg');if(s){s.style.width=zoom.value+'%';s.style.height='auto';s.style.maxWidth='none'}}zoom.oninput=applyZoom;function saveFullSVG(){
   if(!svgText){status.classList.remove('hidden');status.textContent='Prvo izradi SVG.';return}
   try{
@@ -78,11 +80,18 @@ $('#vectorColors').addEventListener('input',()=>$('#vectorColorsLabel').textCont
 $('#noiseReduction').addEventListener('input',()=>$('#noiseReductionLabel').textContent=$('#noiseReduction').value+'%');
 
 function syncCleanupOptions(){
-  const on=$('#ultraCleanup').checked;
+  const exact=$('#keepAllDetail').checked;
+  const on=$('#ultraCleanup').checked&&!exact;
   $('#minIsland').disabled=!on;
   $('#minHole').disabled=!on;
   $('#edgeSmoothness').disabled=!on;
   $('#segmentScale').disabled=!on;
+  $('#ultraCleanup').disabled=exact;
+  $('#noiseReduction').disabled=exact;
+  $('#curveTolerance').disabled=exact;
+  $('#detailModeExplanation').textContent=exact?
+    'Svi izvorni rubni čvorovi, bez glađenja ili odbacivanja malih kontura. Broj SVG segmenata može biti vrlo velik. Boje se i dalje kvantiziraju u odabranu paletu.':
+    'Prilagodba krivulja uz zasebnu mogućnost uklanjanja šuma i glađenja rubova.';
 }
 $('#ultraCleanup').addEventListener('change',syncCleanupOptions);
 $('#minIsland').addEventListener('input',()=>$('#minIslandLabel').textContent=$('#minIsland').value+' px²');
@@ -90,3 +99,6 @@ $('#minHole').addEventListener('input',()=>$('#minHoleLabel').textContent=$('#mi
 syncCleanupOptions();
 
 $('#edgeSmoothness').addEventListener('input',()=>$('#edgeSmoothnessLabel').textContent=$('#edgeSmoothness').value+'%');
+
+$('#keepAllDetail').addEventListener('change',syncCleanupOptions);
+$('#curveTolerance').addEventListener('input',()=>$('#curveToleranceLabel').textContent=(Number($('#curveTolerance').value)/100).toFixed(2).replace('.',',')+' px');
