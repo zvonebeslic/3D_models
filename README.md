@@ -104,3 +104,25 @@ Uspoređuje se **očišćeni original s uklonjenom pozadinom**, odnosno baš ono
 **Automatski pronađi najbolje postavke**: Novi modul vector-autotune.js isprobava do sedam konfiguracija Full Vector vektorizacije. Svaki probni SVG uspoređuje s istim izvornim logom uzimajući u obzir boje, prozirnost te vanjske i unutarnje rubove. Kandidati se rangiraju po ukupnoj izmjerenoj pogrešci, a pobjedničke se postavke primjenjuju na novu vektorizaciju originalne slike. Za brzinu na mobitelu probne konfiguracije koriste prikaz do oko 180 000 piksela, a završni se SVG računa u izvornoj rezoluciji. Ovo je **odabir među provjerenim konfiguracijama**, a ne samostalna rekonstrukcija izvornog dizajna ili dokaz savršene geometrije.
 
 Oba su modula lokalna, bez slanja izvornog loga na vanjski poslužitelj. Ugrađeni vektorski eksport i njegova prethodna podešavanja ostaju dostupni. Node testovi provjeravaju potpuno prozirne RGB piksele, pomake vanjskih i unutarnjih rubova, očuvanje boja te spajanje UI kontrola.
+
+
+## Full Vector v15 · TRUECOLOR 1:1 i mikroprecizne konture
+
+Novi način rada omogućuje da se pri vektorizaciji ne koristi nijedna ograničena RGB paleta.
+
+**TRUECOLOR 1:1 · svaka RGBA nijansa** (zadani odabir): pregledava svaki dekodirani vidljivi piksel originala u njegovoj izvornoj rezoluciji i čuva zasebno svaku različitu 8-bitnu RGBA kombinaciju. Jednakobojni susjedni pikseli spajaju se samo ako im se potpuno podudaraju sve četiri komponente (crvena, zelena, plava i prozirnost). Rezultat su stvarne SVG putanje koje ocrtavaju pravokutnike u izvornoj pikselnoj mreži. Nije umetnut ni povezan raster ni SVG image element. Zbog toga je prikaz pri izvornoj rezoluciji vrlo vjeran, ali na ekstremnom povećanju ostaju vidljive izvorne rasterizacijske stepenice. Izgubljene podatke mutnog JPG-a nije moguće vratiti samo povećanjem broja vektorskih točaka.
+
+**TRUECOLOR MICRO · sve nijanse + precizne konture**: čuva istu izvornu RGBA paletu, a sloju dodaje precizno vektoriziranu rubnu masku s Bézierovim konturama. Tako vizualno zaglađuje neke vanjske obrise. Taj postupak namjerno može promijeniti rubove i zato NIJE matematička 1:1 kopija izvorne pikselne mreže. Za strogu usporedbu ili forenzički vjernu kopiju koristi TRUECOLOR 1:1.
+
+**Klasične Bézierove krivulje** ostaju kao treći odabir. Koriste dosadašnju ograničenu paletu (1–16 boja) i kontrolirano pojednostavljivanje, uz mnogo manje SVG datoteke. Ranije kontrole čišćenja i zaglađivanja nisu izbrisane.
+
+Na raspolaganju je i opcija **Zadrži sve izvorne piksele, uključujući pozadinu**, posebno za JPG-ove kod kojih automatsko odvajanje pozadine može pogrešno ukloniti stvarne boje. Bez nje se TRUECOLOR primjenjuje na ranije izdvojeni logo s maskom pozadine.
+
+Automatsko podešavanje sada među kandidatima razmatra i oba TRUECOLOR načina te ih uspoređuje s postojećim varijantama krivulja. Probna usporedba je ograničena na oko 80 000 piksela radi mobitela, ali konačni SVG se računa iz izvorne slike. Preporučuje se zatim gumb **Usporedi s originalom** i pregled rubova na 800% uvećanja.
+
+### Tehnička ograničenja
+
+- Očuvanje nijansi odnosi se na **8-bitni RGBA prikaz koji preglednik dekodira**, odnosno do 16 777 216 mogućih RGB kombinacija s do 256 vrijednosti alfa kanala. Nije rekonstrukcija izvornog RGB/CMYK/ICC profila, 16-bitnog PNG kanala ni izgubljenih boja i rubova prije JPEG kompresije.
+- Nema tihog smanjivanja slike za TRUECOLOR: ako original prelazi 10 milijuna piksela, alat javlja ograničenje. Velik broj jedinstvenih boja može proizvesti vrlo velik SVG; u tom slučaju alat prijavljuje ograničenja memorije bez automatskog spajanja boja.
+- Rezultat je vektorski SVG sastavljen od mnoštva oblika, ali putanje izrađene po pikselima **nisu ekvivalentne ponovno nacrtanom idealnom logotipu** s nekoliko matematički savršenih krivulja. Za tisak na velikom formatu može biti potrebna profesionalna ručna rekonstrukcija.
+- Programski testovi provjeravaju doslovno očuvanje originalnih RGBA uzoraka, razliku alfa nijansi, optimizaciju jednakih uzastopnih boja, pozadinsku masku, male elemente i SVG strukturu. Stvarne razlike prikaza ovise o pregledniku i njegovu SVG rasterizatoru.
