@@ -8,86 +8,78 @@ function clamp(n,a,b){return Math.min(b,Math.max(a,n));}
 function rgbDist2(a,b){var r=a[0]-b[0],g=a[1]-b[1],bl=a[2]-b[2];return r*r+g*g+bl*bl;}
 function hex(c){return "#"+c.map(function(n){return clamp(Math.round(n),0,255).toString(16).padStart(2,"0");}).join("");}
 function area(p){var a=0;for(var i=0,j=p.length-1;i<p.length;j=i++)a+=p[j].x*p[i].y-p[i].x*p[j].y;return a/2;}
-function paletteFor(mask,pixels,w,h,alpha,maxColors,similarity,exhaustive){
-  var n=w*h,step=exhaustive?1:Math.max(1,Math.floor(Math.sqrt(n/28000)));
-  var bins=new Map(),total=0;
-  // In original mode visit EVERY foreground pixel instead of sampling a
-  // handful of positions. Rare accent colors must not disappear unseen.
+function paletteFor(mask,pixels,w,h,alpha,maxColors,similarity){
+  var n=w*h,step=Math.max(1,Math.floor(Math.sqrt(n/28000)));
+  var bins=new Map(),samples=[],total=0;
   for(var y=0;y<h;y+=step)for(var x=0;x<w;x+=step){
     var at=y*w+x,idx=at*4;
-    if(!mask[at]||(alpha&&pixels[idx+3]<(exhaustive?24:210)))continue;
-    var r=pixels[idx],g=pixels[idx+1],b=pixels[idx+2];
-    var key=((r>>3)<<10)|((g>>3)<<5)|(b>>3);
-    var entry=bins.get(key);
-    if(!entry){entry={count:0,sum:[0,0,0]};bins.set(key,entry);}
-    entry.count++;entry.sum[0]+=r;entry.sum[1]+=g;entry.sum[2]+=b;
-    total++;
+    if(!mask[at]||(alpha&&pixels[idx+3]<210))continue;
+    var rgb=[pixels[idx],pixels[idx+1],pixels[idx+2]];
+    samples.push(rgb);total++;
+    var key=((rgb[0]>>3)<<10)|((rgb[1]>>3)<<5)|(rgb[2]>>3);
+    var b=bins.get(key);
+    if(!b){b={count:0,sum:[0,0,0]};bins.set(key,b);}
+    b.count++;
+    for(var ch=0;ch<3;ch++)b.sum[ch]+=rgb[ch];
   }
-  if(!bins.size){
-    for(var j=0;j<n;j++)if(mask[j]){
-      var i=j*4,rr=pixels[i],gg=pixels[i+1],bb=pixels[i+2];
-      var key=((rr>>3)<<10)|((gg>>3)<<5)|(bb>>3);
-      var entry=bins.get(key);
-      if(!entry){entry={count:0,sum:[0,0,0]};bins.set(key,entry);}
-      entry.count++;entry.sum[0]+=rr;entry.sum[1]+=gg;entry.sum[2]+=bb;
-      total++;
+  if(!samples.length){
+    for(var j=0;j<n;j+=Math.max(1,Math.ceil(n/18000)))if(mask[j]){
+      var i=j*4;
+      samples.push([pixels[i],pixels[i+1],pixels[i+2]]);
     }
   }
-  if(!bins.size)throw Error("Logo nema nijednog vidljivog piksela.");
+  if(!samples.length)throw Error("Logo nema nijednog vidljivog piksela.");
   var hist=Array.from(bins.values()).sort(function(a,b){return b.count-a.count;});
   var seeds=[],minSeparation=Math.max(24,similarity*.78);
+  // Seed using frequency, not farthest-point outliers (those are usually JPEG noise).
   for(var b of hist){
-    if(!exhaustive&&b.count<Math.max(2,total*.00065))continue;
-    var color=b.sum.map(function(v){return v/b.count;});
-    if(seeds.every(function(c){return rgbDist2(color,c)>minSeparation*minSeparation;}))
-      seeds.push(color);
+    if(b.count<Math.max(2,total*.00065))continue;
+    var c=b.sum.map(function(v){return v/b.count;});
+    if(seeds.every(function(s){return rgbDist2(c,s)>minSeparation*minSeparation;}))
+      seeds.push(c);
     if(seeds.length>=maxColors)break;
   }
-  if(!seeds.length)seeds.push(hist[0].sum.map(function(v){return v/hist[0].count;}));
-  // Weighted histogram K-means avoids millions of temporary RGB arrays on
-  // mobile, while still including rare source colors in original mode.
+  if(!seeds.length)seeds.push(samples[0]);
+  // Small palette k-means: the number of colors is never artificially fixed at 48.
   for(var pass=0;pass<4;pass++){
-    var counts=new Float64Array(seeds.length),
-      sums=Array.from({length:seeds.length},function(){return[0,0,0];});
-    for(var bin of hist){
-      var col=bin.sum.map(function(v){return v/bin.count;});
-      var nearest=0,best=Infinity;
+    var counts=new Float64Array(seeds.length);
+    var sums=Array.from({length:seeds.length},()=>[0,0,0]);
+    for(var s of samples){
+      var bi=0,bd=Infinity;
       for(var k=0;k<seeds.length;k++){
-        var d=rgbDist2(col,seeds[k]);if(d<best){best=d;nearest=k;}
+        var d=rgbDist2(s,seeds[k]);if(d<bd){bd=d;bi=k;}
       }
-      counts[nearest]+=bin.count;
-      for(var ch=0;ch<3;ch++)sums[nearest][ch]+=bin.sum[ch];
+      counts[bi]++;
+      for(var t=0;t<3;t++)sums[bi][t]+=s[t];
     }
-    for(var k=0;k<seeds.length;k++)if(counts[k])
-      seeds[k]=sums[k].map(function(v){return v/counts[k];});
+    for(var kk=0;kk<seeds.length;kk++)if(counts[kk]){
+      seeds[kk]=sums[kk].map(function(v){return v/counts[kk];});
+    }
   }
-  var sizes=new Float64Array(seeds.length);
-  for(var bin of hist){
-    var rgb=bin.sum.map(function(v){return v/bin.count;});
-    var nearest=0,best=Infinity;
-    for(var k=0;k<seeds.length;k++){
-      var d=rgbDist2(rgb,seeds[k]);if(d<best){best=d;nearest=k;}
-    }
-    sizes[nearest]+=bin.count;
+  // Merge near-identical palette centers AND reject micro-clusters.
+  var sizes=new Int32Array(seeds.length);
+  for(var s of samples){
+    var bi=0,bd=Infinity;
+    for(var k=0;k<seeds.length;k++){var d=rgbDist2(s,seeds[k]);if(d<bd){bd=d;bi=k;}}
+    sizes[bi]++;
   }
   var entries=seeds.map(function(color,i){return{color:color,n:sizes[i]};})
     .sort(function(a,b){return b.n-a.n;});
   var merged=[];
   for(var e of entries){
-    if(!e.n)continue;
-    if(!exhaustive&&e.n<Math.max(3,total*.002)&&merged.length)continue;
+    if(e.n < Math.max(3,samples.length*.002) && merged.length)continue;
     var nearest=null,best=Infinity;
-    for(var group of merged){
-      var d=rgbDist2(e.color,group.color);
-      if(d<best){best=d;nearest=group;}
+    for(var m of merged){
+      var d=rgbDist2(e.color,m.color);
+      if(d<best){best=d;nearest=m;}
     }
     if(nearest&&best<similarity*similarity){
-      var count=nearest.n+e.n;
-      nearest.color=nearest.color.map(function(v,i){return(v*nearest.n+e.color[i]*e.n)/count;});
-      nearest.n=count;
+      var t=nearest.n+e.n;
+      nearest.color=nearest.color.map(function(v,i){return(v*nearest.n+e.color[i]*e.n)/t;});
+      nearest.n=t;
     }else if(merged.length<maxColors)merged.push({color:e.color,n:e.n});
   }
-  if(!merged.length)merged.push(entries[0]);
+  if(!merged.length)merged.push(entries[0]||{color:samples[0],n:1});
   merged.sort(function(a,b){return b.n-a.n;});
   return merged.map(function(e){return e.color;});
 }
@@ -162,18 +154,13 @@ function removeSmallRegions(labels,w,h,minPixels){
   }
   return{labels:labels,removed:removed};
 }
-function toPath(loops,fitTolerance,detailMode){
-  var raw=detailMode==="original";
+function toPath(loops,fitTolerance){
   var pieces=[],points=0,segments=0;
   for(var loop of loops){
     if(loop.length<3||Math.abs(area(loop))<.40)continue;
-    // Original mode retains every measured vertex. No RDP, spline fit,
-    // smoothing, noise filtering or reduction of actual contour vertices.
-    var d=raw?
-      "M"+loop.map(function(p){return Number(p.x.toFixed(6))+" "+Number(p.y.toFixed(6));}).join(" L")+" Z":
-      (root.TraceFit&&root.TraceFit.pathD)?
-        root.TraceFit.pathD(loop,true,fitTolerance):
-        "M"+loop.map(function(p){return Number(p.x.toFixed(6))+" "+Number(p.y.toFixed(6));}).join(" L")+" Z";
+    var d=(root.TraceFit&&root.TraceFit.pathD)?
+      root.TraceFit.pathD(loop,true,fitTolerance):
+      "M"+loop.map(function(p){return p.x.toFixed(3)+" "+p.y.toFixed(3);}).join(" L")+" Z";
     if(!d)continue;
     pieces.push(d);points+=loop.length;
     segments+=(d.match(/ [LC]/g)||[]).length;
@@ -196,11 +183,9 @@ function FullVector(mask,img,W,H,opts){
 
   // Geometry-first: clean raster topology BEFORE any colors or curve fitting.
   // True large holes, separate accents and thin strokes remain when above thresholds.
-  var detailMode=opts.detailMode==="original"?"original":"curves";
-  // Fidelity mode is nondestructive regardless of previous UI slider values.
-  var islandLimit=detailMode==="original"?0:(opts.minIsland==null?6:Math.max(0,Number(opts.minIsland)||0));
-  var holeLimit=detailMode==="original"?0:(opts.minHole==null?14:Math.max(0,Number(opts.minHole)||0));
-  var cleanupOn=detailMode==="original"?false:opts.ultraCleanup!==false;
+  var islandLimit=opts.minIsland==null?6:Math.max(0,Number(opts.minIsland)||0);
+  var holeLimit=opts.minHole==null?14:Math.max(0,Number(opts.minHole)||0);
+  var cleanupOn=opts.ultraCleanup!==false;
   var cleaned=cleanupOn?cleanup.clean(original,W,H,{
     minIsland:islandLimit,minHole:holeLimit,notchRepair:opts.notchRepair!==false && holeLimit>0
   }):{mask:original,removedIslands:0,filledHoles:0,
@@ -216,19 +201,18 @@ function FullVector(mask,img,W,H,opts){
   // Crop every connected shape locally, optionally interpolate its ORIGINAL
   // coverage field at 2x/3x. Do not upscale an already fitted SVG.
   // Large components safely fall back to 1x rather than exhausting RAM.
-  var zoom=detailMode==="original"?1:cleanupOn?Math.round(clamp(Number(opts.segmentScale)||2,1,3)):1;
-  var edgeSmoothness=detailMode==="original"?0:cleanupOn?clamp(opts.edgeSmoothness==null?65:Number(opts.edgeSmoothness),0,100):0;
-  var curveTolerance=opts.curveTolerance==null?(.52+edgeSmoothness*.0055):
-    clamp(Number(opts.curveTolerance),.18,3);
+  var zoom=cleanupOn?Math.round(clamp(Number(opts.segmentScale)||2,1,3)):1;
+  var edgeSmoothness=cleanupOn?clamp(opts.edgeSmoothness==null?65:Number(opts.edgeSmoothness),0,100):0;
+  var curveTolerance=.52+edgeSmoothness*.0055;
   var main=cleanup.traceComponents(foreground,coverage,W,H,{
     zoom:zoom,maxLocalPixels:2400000,minArea:.25,edgeSmoothness:edgeSmoothness
   });
-  var silhouette=toPath(main.loops,curveTolerance,detailMode);
+  var silhouette=toPath(main.loops,curveTolerance);
   if(!silhouette.paths)throw Error("Nije prepoznata silueta. Pokušaj drugačiji izvorni PNG.");
 
-  var strength=detailMode==="original"?0:clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
+  var strength=clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
   var palette=paletteFor(foreground,pix,W,H,hasAlpha,
-    clamp(Number(opts.maxColors)||12,1,16),28+strength*.43,detailMode==="original");
+    clamp(Number(opts.maxColors)||12,1,16),28+strength*.43);
   var labels=classify(foreground,pix,W,H,palette);
   var passes=strength<10?0:strength<45?1:2;
   if(palette.length>1&&passes)labels=majorityFilter(labels,W,H,passes);
@@ -243,18 +227,17 @@ function FullVector(mask,img,W,H,opts){
   var base=0;
   for(var k=1;k<counts.length;k++)if(counts[k]>counts[base])base=k;
   function shapeTag(d,color){
-    // No geometry-expanding stroke in original fidelity mode.
-    var seamStroke=detailMode==="original"?"none":color;
-    return '<path d="'+d+'" fill="'+color+'" fill-rule="evenodd" stroke="'+seamStroke+
-      '" stroke-width="'+(detailMode==="original"?"0":"0.10")+
-      '" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke fill"/>';
+    // Tiny paint-under stroke prevents pinhole seams caused by SVG antialiasing
+    // without inserting a raster element or destroying transparent letter holes.
+    return '<path d="'+d+'" fill="'+color+'" fill-rule="evenodd" stroke="'+color+
+      '" stroke-width="0.10" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke fill"/>';
   }
   var body=[shapeTag(silhouette.d,hex(palette[base]))];
   var totalPaths=silhouette.paths,totalPoints=silhouette.points,
       totalSegments=silhouette.segments,colors=1,
       components=main.stats.components,refined=main.stats.refined,
       fallback=main.stats.fallback,removedColor=denoised.removed;
-  var minColorArea=detailMode==="original"?0:opts.minColorArea==null?Math.max(5,Math.round(strength*.14)):
+  var minColorArea=opts.minColorArea==null?Math.max(5,Math.round(strength*.14)):
     Math.max(0,Number(opts.minColorArea)||0);
   for(var k=0;k<palette.length;k++){
     if(k===base||counts[k]<minColorArea)continue;
@@ -272,7 +255,7 @@ function FullVector(mask,img,W,H,opts){
     var local=cleanup.traceComponents(region,regionCoverage,W,H,{
       zoom:zoom,maxLocalPixels:1700000,minArea:.25,edgeSmoothness:edgeSmoothness
     });
-    var vector=toPath(local.loops,detailMode==="original"?0:(curveTolerance+.08),detailMode);
+    var vector=toPath(local.loops,.60+edgeSmoothness*.0045);
     if(!vector.paths)continue;
     body.push(shapeTag(vector.d,hex(palette[k])));
     totalPaths+=vector.paths;totalPoints+=vector.points;
@@ -290,7 +273,7 @@ function FullVector(mask,img,W,H,opts){
     microHolesFilled:cleaned.filledHoleCount,
     microHolePixels:cleaned.filledHoles,
     microNotchesRepaired:cleaned.correctedNotches,
-    components:components,refined:refined,fallback:fallback,edgeSmoothness:edgeSmoothness,detailMode:detailMode};
+    components:components,refined:refined,fallback:fallback,edgeSmoothness:edgeSmoothness};
 }
 root.FullVector=FullVector;
 root.FullVectorV5={paletteFor:paletteFor,classify:classify,majorityFilter:majorityFilter,
