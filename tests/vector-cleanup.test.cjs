@@ -137,3 +137,8 @@ test("zero hole threshold leaves an intentional single-pixel counter untouched",
   assert.equal(r.microNotchesRepaired,0);
   assert.equal(r.paths,2);
 });
+
+test("gaussian edge smoothing reduces jagged outline perimeter",()=>{const w=140,h=140,mask=binary(w,h,(x,y)=>x>=30+(y%7===0?3:0)&&x<125&&y>=10&&y<125),alpha=Uint8Array.from(mask,v=>v?255:0);const a=cleanup.traceComponents(mask,alpha,w,h,{zoom:2,edgeSmoothness:0}),b=cleanup.traceComponents(mask,alpha,w,h,{zoom:2,edgeSmoothness:65});function length(p){let n=0;for(let i=0;i<p.length;i++){let a=p[i],b=p[(i+1)%p.length];n+=Math.hypot(a.x-b.x,a.y-b.y);}return n;}assert.equal(a.loops.length,1);assert.equal(b.loops.length,1);assert.ok(length(b.loops[0])<length(a.loops[0])*.95);});
+test("gaussian smoothing preserves large and tiny enclosed holes",()=>{const w=120,h=120,s=logo(w,h,(x,y)=>{const outer=x>=12&&x<108&&y>=12&&y<108;const hole=(x>=45&&x<65&&y>=48&&y<78)||(x===83&&y===83);return outer&&!hole?black:clear;});const r=vector(s.mask,s.img,w,h,{ultraCleanup:true,minIsland:0,minHole:0,edgeSmoothness:65,segmentScale:2});assert.equal(r.paths,3);assert.equal(r.microHolesFilled,0);assert.equal(r.microNotchesRepaired,0);});
+test("zero edge smoothing uses the original confidence buffer unchanged",()=>{const field=new Uint8Array([0,255,0,255,30,0,130,0,255]);assert.equal(cleanup._test.smoothCoverage(field,3,3,0),field);});
+test("disabling ultra cleanup also disables edge smoothing",()=>{const s=logo(120,80,(x,y)=>x>=12&&x<108&&y>=8&&y<72?black:clear);const r=vector(s.mask,s.img,s.w,s.h,{ultraCleanup:false,edgeSmoothness:100});assert.equal(r.edgeSmoothness,0);});
