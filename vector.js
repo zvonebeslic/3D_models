@@ -150,3 +150,134 @@ $('#minHole').addEventListener('input',()=>$('#minHoleLabel').textContent=$('#mi
 syncCleanupOptions();
 
 $('#edgeSmoothness').addEventListener('input',()=>$('#edgeSmoothnessLabel').textContent=$('#edgeSmoothness').value+'%');
+
+
+// Full Vector accuracy inspection: compare only the foreground reference
+// with the SVG rasterization, never the unremoved JPG background.
+const qualityProgress=$('#qualityProgress'),diffPanel=$('#diffPanel');
+function drawComparedCanvas(id,source,overlay){
+  const el=$(id);el.width=source.width;el.height=source.height;
+  const ctx=el.getContext('2d',{willReadFrequently:false});
+  ctx.clearRect(0,0,el.width,el.height);
+  ctx.drawImage(source,0,0);
+  if(overlay)ctx.drawImage(overlay,0,0);
+}
+function fmtQuality(value,digits=2){
+  return Number(value).toLocaleString('hr-HR',{
+    maximumFractionDigits:digits,minimumFractionDigits:digits
+  });
+}
+async function compareCurrent(){
+  if(!svgText)throw Error('Prvo izradi SVG.');
+  const result=await window.VectorDiff.compare(
+    getVectorReference(),svgText,W,H,{
+      threshold:Number($('#diffThreshold').value),
+      edgeTolerance:Number($('#edgeTolerance').value),
+      maxPixels:700000
+    }
+  );
+  const m=result.metrics;
+  $('#diffStats').textContent=
+    'Prosječna pogreška: '+fmtQuality(m.averageError)+
+    '/255 · Maksimalna: '+fmtQuality(m.maximumError)+
+    '/255 · Različiti pikseli: '+m.differentPixels.toLocaleString('hr-HR')+
+    ' ('+fmtQuality(m.differentPercent)+'%) · Odstupanje rubova: '+
+    fmtQuality(m.edgeMismatchPercent)+'% · Srednja udaljenost rubova: '+
+    fmtQuality(m.meanEdgeDistance)+' px'+
+    (result.scaled?' · Analiza umanjena na '+
+      result.comparisonWidth+' × '+result.comparisonHeight+
+      ' px zbog memorije. SVG ostaje izvorne veličine.':
+      ' · Analiza u izvornoj rezoluciji.');
+  drawComparedCanvas('#originalDiffPreview',result.sourceCanvas);
+  drawComparedCanvas('#svgDiffPreview',result.renderedCanvas);
+  drawComparedCanvas('#colorDiffPreview',result.sourceCanvas,result.heatmapCanvas);
+  drawComparedCanvas('#edgeDiffPreview',result.sourceCanvas,result.edgeCanvas);
+  diffPanel.classList.remove('hidden');
+  return result;
+}
+let qualityBusy=false;
+$('#compareSvg').onclick=async()=>{
+  if(qualityBusy)return;
+  qualityBusy=true;
+  $('#compareSvg').disabled=true;$('#autoTuneSvg').disabled=true;
+  qualityProgress.textContent='Analiziram boje, prozirnost i položaj rubova…';
+  try{
+    await compareCurrent();
+    qualityProgress.textContent='✓ Analiza završena. Karta pokazuje gdje SVG odstupa od originala.';
+    diffPanel.scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(error){
+    console.error(error);
+    qualityProgress.textContent='Usporedba nije uspjela: '+error.message;
+  }finally{
+    qualityBusy=false;$('#compareSvg').disabled=false;$('#autoTuneSvg').disabled=false;
+  }
+};
+$('#diffThreshold').addEventListener('input',()=>{
+  $('#diffThresholdValue').textContent=$('#diffThreshold').value;
+});
+function showTuningResults(output){
+  const el=$('#autoTuneResults');
+  el.replaceChildren();
+  const intro=document.createElement('p');
+  intro.textContent='Najbolji od '+output.attempts.length+' probnih postupaka: '+
+    output.best.name+' (ocjena '+fmtQuality(output.best.score,3)+', niže je bolje). '+
+    'Postavke su izmjerene na uzorku '+output.sampledWidth+' × '+
+    output.sampledHeight+' px i zatim primijenjene na izvornu rezoluciju.';
+  el.append(intro);
+  const table=document.createElement('table');
+  const heading=document.createElement('tr');
+  for(const name of ['Postupak','Ocjena ↓','Rubovi','Boje']){
+    const cell=document.createElement('th');cell.textContent=name;heading.append(cell);
+  }
+  table.append(heading);
+  for(const trial of output.ranking){
+    const row=document.createElement('tr');
+    if(trial===output.best)row.className='qualityBest';
+    for(const value of [
+      trial.name,fmtQuality(trial.score,3),
+      fmtQuality(trial.edgeMismatchPercent)+'%',String(trial.colors)
+    ]){
+      const cell=document.createElement('td');cell.textContent=value;row.append(cell);
+    }
+    table.append(row);
+  }
+  el.append(table);el.classList.remove('hidden');
+}
+$('#autoTuneSvg').onclick=async()=>{
+  if(qualityBusy)return;
+  qualityBusy=true;run.disabled=true;
+  $('#compareSvg').disabled=true;$('#autoTuneSvg').disabled=true;
+  qualityProgress.textContent='Pripremam automatsku analizu…';
+  try{
+    if(!imgData||!mask)await prepare();
+    const source=getVectorReference();
+    const tuned=await window.VectorAutotune.run(
+      source,W,H,currentVectorOptions(),{
+        maxPixels:180000,
+        threshold:Number($('#diffThreshold').value),
+        edgeTolerance:Number($('#edgeTolerance').value),
+        onProgress:(index,total,name)=>{
+          qualityProgress.textContent='Isprobavam '+Math.min(index+1,total)+
+            '/'+total+': '+name+'…';
+        }
+      }
+    );
+    setVectorOptions(tuned.best.settings);
+    qualityProgress.textContent='Najbolja probna postavka: '+
+      tuned.best.name+'. Izrađujem konačni SVG…';
+    await generateVector();
+    showTuningResults(tuned);
+    qualityProgress.textContent='Provjeravam konačni SVG na originalnoj slici…';
+    await compareCurrent();
+    qualityProgress.textContent='✓ Automatsko podešavanje i usporedba gotovi. '+
+      'Odabrane su najbolje izmjerene probne postavke.';
+    $('#autoTuneResults').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(error){
+    console.error(error);
+    qualityProgress.textContent='Automatsko podešavanje nije uspjelo: '+error.message;
+  }finally{
+    qualityBusy=false;run.disabled=false;
+    $('#compareSvg').disabled=!svgText;
+    $('#autoTuneSvg').disabled=!svgText;
+  }
+};
