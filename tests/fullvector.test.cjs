@@ -82,7 +82,11 @@ test("palette/noise controls are wired to the home-page Full Vector action",()=>
   const controller=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
   assert.match(html,/id="vectorColors"/);
   assert.match(html,/id="noiseReduction"/);
-  assert.match(html,/fullvector\.js\?v=vector10/);
+  assert.match(html,/fullvector\.js\?v=vector11/);
   assert.match(controller,/window\.FullVector\(mask,imgData,W,H,\{/);
   assert.match(controller,/confidence\[n\]<112/);
 });
+
+test("original mode retains hundreds of true SVG edge segments instead of smoothing them away",()=>{const w=200,h=140;const sample=make(w,h,(x,y)=>x>=15+(y%5===0?2:0)&&x<160&&y>10&&y<125?black:clear);const raw=vector(sample,{detailMode:"original",ultraCleanup:true,edgeSmoothness:100,minIsland:60,minHole:60});const curved=vector(sample,{detailMode:"curves",edgeSmoothness:85,minIsland:60,minHole:60});assert.equal(raw.detailMode,"original");assert.equal(raw.edgeSmoothness,0);assert.ok(raw.segments>curved.segments*8);assert.match(raw.svg,/stroke="none"/);assert.equal(raw.microIslandsRemoved,0);});
+test("original mode preserves single-pixel counters and tiny isolated details",()=>{const w=120,h=120;const s=make(w,h,(x,y)=>(x>=10&&x<110&&y>=10&&y<110&&!(x===50&&y===50))||(x===3&&y===3)?black:clear);const out=vector(s,{detailMode:"original",ultraCleanup:true,minIsland:70,minHole:70,edgeSmoothness:90});assert.equal(out.paths,3);assert.equal(out.microHolesFilled,0);assert.equal(out.microIslandsRemoved,0);assert.equal(out.detailMode,"original");});
+test("homepage enables raw contour mode by default",()=>{const fs=require("node:fs"),path=require("node:path");const html=fs.readFileSync(path.join(__dirname,"../index.html"),"utf8");const js=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");assert.match(html,/id="keepAllDetail" checked/);assert.match(html,/id="curveTolerance"/);assert.match(html,/fullvector\.js\?v=vector11/);assert.match(js,/detailMode:.*keepAllDetail/);});
