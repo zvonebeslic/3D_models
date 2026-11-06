@@ -127,3 +127,13 @@ test("homepage wires all segmentation sliders and imports the cleanup module",()
   assert.match(html,/vector-cleanup\.js\?v=vector8/);
   assert.match(controller,/ultraCleanup:\$\('#ultraCleanup'\)\.checked/);
 });
+
+test("zero hole threshold leaves an intentional single-pixel counter untouched",()=>{
+  const w=40,h=40;
+  const data=logo(w,h,(x,y)=>x>=4&&x<36&&y>=4&&y<36&&!(x===20&&y===20)?black:clear);
+  const r=vector(data.mask,data.img,w,h,{
+    ultraCleanup:true,minIsland:0,minHole:0,segmentScale:1});
+  assert.equal(r.microHolesFilled,0);
+  assert.equal(r.microNotchesRepaired,0);
+  assert.equal(r.paths,2);
+});
