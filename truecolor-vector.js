@@ -122,7 +122,7 @@ function TrueColorVector(mask,image,w,h,opts){
     clip=microClip(coverage,w,h,opts);
     if(clip.d){
       defs='<defs><clipPath id="tc-micro-clip" clipPathUnits="userSpaceOnUse">'+
-        '<path d="'+clip.d+'" clip-rule="evenodd"/></clipPath></defs>';
+        '<path d="'+clip.d+'" clip-rule="evenodd" shape-rendering="geometricPrecision"/></clipPath></defs>';
       open='<g clip-path="url(#tc-micro-clip)">';close='</g>';
       microPoints=clip.points;type="micro";
     }
