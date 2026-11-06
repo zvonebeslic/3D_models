@@ -91,3 +91,16 @@ Kako bi se zaštitili **stvarni unutarnji otvori**, izvorne zatvorene prozirne p
 
 Zaglađivanje zahtijeva uključeno **ULTRA čišćenje** i primjenjuje se i na granice višebojnih regija. Može blago zaobliti vrlo sitne kutove, zato su zadana 65% i prilagodljivi klizač namjerno kompromis. Nakon promjene postavke potrebno je ponovno kliknuti **FULL VECTOR SVG**. Ne obećava se oporavak geometrije izgubljene zbog kompresije/mutnog originala.
 
+
+
+## Kontrola vjernosti SVG-a i automatsko podešavanje · Full Vector v14
+
+Nakon što klikneš **FULL VECTOR SVG**, u kartici rezultata dostupna su dva nova postupka.
+
+**Usporedi s originalom**: SVG se ponovno iscrta u transparentni raster i usporedi s očišćenim izvornim logom. Prikazuju se originalni logo, ponovno iscrtani SVG, karta promjena boja/prozirnosti i zasebna karta odstupanja rubova. Mjere se prosječna i maksimalna pogreška boja na skali 0–255, broj i postotak različitih piksela, prosječna udaljenost rubova te udio rubova udaljenih više od zadanog praga. Crvena boja na karti rubova označava promašen izvorni rub, a plava višak SVG ruba. Usporedba uzima u obzir i **unutarnje granice boja**, ne samo vanjsku siluetu.
+
+Uspoređuje se **očišćeni original s uklonjenom pozadinom**, odnosno baš ono što Full Vector prima za obradu. To nije usporedba cijelog sirovog JPG-a s pozadinom. Boje potpuno prozirnih piksela ne stvaraju lažne pogreške. Za velike datoteke analiza je ograničena na najviše približno 700 000 uzorkovanih piksela. Rezultati jasno prikazuju stvarnu rezoluciju analize; konačni SVG ostaje izvorne veličine. Vizualni prikaz može se zumirati do 800%, a karta odstupanja rubova može se preuzeti kao PNG.
+
+**Automatski pronađi najbolje postavke**: Novi modul vector-autotune.js isprobava do sedam konfiguracija Full Vector vektorizacije. Svaki probni SVG uspoređuje s istim izvornim logom uzimajući u obzir boje, prozirnost te vanjske i unutarnje rubove. Kandidati se rangiraju po ukupnoj izmjerenoj pogrešci, a pobjedničke se postavke primjenjuju na novu vektorizaciju originalne slike. Za brzinu na mobitelu probne konfiguracije koriste prikaz do oko 180 000 piksela, a završni se SVG računa u izvornoj rezoluciji. Ovo je **odabir među provjerenim konfiguracijama**, a ne samostalna rekonstrukcija izvornog dizajna ili dokaz savršene geometrije.
+
+Oba su modula lokalna, bez slanja izvornog loga na vanjski poslužitelj. Ugrađeni vektorski eksport i njegova prethodna podešavanja ostaju dostupni. Node testovi provjeravaju potpuno prozirne RGB piksele, pomake vanjskih i unutarnjih rubova, očuvanje boja te spajanje UI kontrola.
