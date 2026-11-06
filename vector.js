@@ -1,5 +1,7 @@
 const $=s=>document.querySelector(s),input=$('#imageInput'),drop=$('#drop'),preview=$('#preview'),previewWrap=$('#previewWrap'),remove=$('#removeImage'),removeBg=$('#removeBg'),run=$('#vectorize'),status=$('#status'),bgCard=$('#bgResultCard'),bgCanvas=$('#bgCanvas'),bgctx=bgCanvas.getContext('2d',{willReadFrequently:true}),cleanPreview=$('#cleanPreview'),resultCard=$('#resultCard'),svgResult=$('#svgResult'),stats=$('#stats'),zoom=$('#zoom'),zoomValue=$('#zoomValue');let url=null,imgData=null,mask=null,W=0,H=0,svgText='';
-function load(f){if(!f||!f.type?.startsWith('image/'))return;if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(f);preview.onload=()=>{drop.classList.add('hidden');previewWrap.classList.remove('hidden');removeBg.disabled=false;run.disabled=false;bgCard.classList.add('hidden');resultCard.classList.add('hidden');status.classList.add('hidden');imgData=mask=null};preview.src=url}input.onchange=e=>load(e.target.files?.[0]);remove.onclick=()=>location.reload();async function image(){return new Promise((r,j)=>{const i=new Image();i.onload=()=>r(i);i.onerror=j;i.src=url})}
+function load(f){if(!f||!f.type?.startsWith('image/'))return;if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(f);preview.onload=()=>{drop.classList.add('hidden');previewWrap.classList.remove('hidden');removeBg.disabled=false;run.disabled=false;bgCard.classList.add('hidden');resultCard.classList.add('hidden');status.classList.add('hidden');imgData=mask=null;svgText='';
+  $('#exportAllShades').disabled=true;$('#compareSvg').disabled=true;$('#autoTuneSvg').disabled=true;
+  };preview.src=url}input.onchange=e=>load(e.target.files?.[0]);remove.onclick=()=>location.reload();async function image(){return new Promise((r,j)=>{const i=new Image();i.onload=()=>r(i);i.onerror=j;i.src=url})}
 async function prepare(){
   const im=await image();
   W=im.naturalWidth||im.width;H=im.naturalHeight||im.height;
@@ -43,6 +45,8 @@ removeBg.onclick=async()=>{removeBg.disabled=true;status.classList.remove('hidde
 function currentVectorOptions(){
   return {
     maxColors:Number($('#vectorColors').value),
+    smartShades:$('#smartShades').checked,
+    curveTolerance:Number($('#curveTolerance').value)/100,
     denoise:Number($('#noiseReduction').value),
     ultraCleanup:$('#ultraCleanup').checked,
     minIsland:Number($('#minIsland').value),
@@ -52,6 +56,9 @@ function currentVectorOptions(){
   };
 }
 function setVectorOptions(settings){
+  $('#smartShades').checked=settings.smartShades!==false;
+  $('#curveTolerance').value=String(Math.round((settings.curveTolerance==null?.25:settings.curveTolerance)*100));
+  $('#curveToleranceLabel').textContent=(Number($('#curveTolerance').value)/100).toFixed(2).replace('.',',')+' px';
   $('#vectorColors').value=String(settings.maxColors);
   $('#noiseReduction').value=String(settings.denoise);
   $('#ultraCleanup').checked=Boolean(settings.ultraCleanup);
@@ -75,16 +82,22 @@ function getVectorReference(){
 function showVector(b){
   svgText=b.svg;
   svgResult.innerHTML=svgText;
-  stats.textContent=b.colors.toLocaleString()+' boja • '+
-    b.paths.toLocaleString()+' kontura • '+
-    b.segments.toLocaleString()+' SVG segmenata • '+
-    b.points.toLocaleString()+' rubnih točaka • '+
+  const shades=window.VectorSmartColor?
+    window.VectorSmartColor.exactShadeCount(imgData.data,mask,180000):null;
+  stats.textContent=b.colors.toLocaleString('hr-HR')+' osnovnih boja • '+
+    (shades?(shades.lowerBound?'Najmanje ':'')+shades.count.toLocaleString('hr-HR')+
+    ' prepoznatih RGBA nijansi • ':'')+
+    (b.gradientCount||0)+' pametnih gradijenata • '+
+    b.paths.toLocaleString('hr-HR')+' kontura • '+
+    b.segments.toLocaleString('hr-HR')+' SVG segmenata • '+
+    b.points.toLocaleString('hr-HR')+' rubnih točaka • '+
     b.microIslandsRemoved+' uklonjenih mrlja • '+
     b.microHolesFilled+' zatvorenih rupica • '+
     b.refined+' lokalno obrađenih segmenata';
   $('#diffPanel').classList.add('hidden');
   $('#compareSvg').disabled=false;
   $('#autoTuneSvg').disabled=false;
+  $('#exportAllShades').disabled=false;
   resultCard.classList.remove('hidden');
   applyZoom();
 }
@@ -120,6 +133,37 @@ function applyZoom(){zoomValue.textContent=zoom.value+'%';const s=svgResult.quer
   }catch(err){status.classList.remove('hidden');status.textContent='Preuzimanje nije uspjelo: '+err.message}
 }
 $('#downloadSvg').onclick=saveFullSVG;
+$('#exportAllShades').onclick=async()=>{
+  if(!imgData||!mask)return;
+  const button=$('#exportAllShades');
+  button.disabled=true;run.disabled=true;
+  status.classList.remove('hidden');
+  status.textContent='Izrađujem poseban 1:1 SVG sa svakom RGBA nijansom očišćenog logotipa…';
+  await new Promise(resolve=>setTimeout(resolve,30));
+  try{
+    const originalMask=new Uint8Array(mask);
+    // For PNG with transparency, preserve even one-alpha source samples.
+    let transparent=false;
+    for(let i=0;i<W*H;i++)if(imgData.data[i*4+3]<245){transparent=true;break;}
+    if(transparent){
+      for(let i=0;i<originalMask.length;i++)originalMask[i]=imgData.data[i*4+3]>0?1:0;
+    }
+    const result=window.TrueColorVector(originalMask,imgData,W,H,{
+      mode:'exact',maxShapes:650000,maxChars:50000000
+    });
+    const blob=new Blob([result.svg],{type:'image/svg+xml;charset=utf-8'});
+    const href=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=href;a.download='logo-sve-nijanse-1-na-1.svg';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(href),60000);
+    status.textContent='✓ Izvoz svih '+result.uniqueRGBA.toLocaleString('hr-HR')+
+      ' RGBA nijansi pokrenut. Glavni SVG s Bézierovim krivuljama ostao je nepromijenjen.';
+  }catch(error){
+    console.error(error);
+    status.textContent='Izvoz svih nijansi nije moguć na ovom uređaju: '+error.message+
+      '. Glavni vektorski SVG nije promijenjen.';
+  }finally{button.disabled=false;run.disabled=false;}
+};
 $('#shareFullSvg').onclick=async()=>{
   if(!svgText)return;
   try{
@@ -136,6 +180,9 @@ $('#shareFullSvg').onclick=async()=>{
 };
 $('#vectorColors').addEventListener('input',()=>$('#vectorColorsLabel').textContent=$('#vectorColors').value);
 $('#noiseReduction').addEventListener('input',()=>$('#noiseReductionLabel').textContent=$('#noiseReduction').value+'%');
+$('#curveTolerance').addEventListener('input',()=>{
+  $('#curveToleranceLabel').textContent=(Number($('#curveTolerance').value)/100).toFixed(2).replace('.',',')+' px';
+});
 
 function syncCleanupOptions(){
   const on=$('#ultraCleanup').checked;
