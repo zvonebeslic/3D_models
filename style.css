@@ -58,3 +58,13 @@
 .diffZoomRow button{color:#eafffa;background:#214f64;border:1px solid #4c8da1;border-radius:9px;padding:10px 14px;min-height:42px;cursor:pointer}
 .diffGrid .checker{overflow:auto;max-height:370px;justify-content:flex-start;align-items:flex-start}
 .diffGrid .checker canvas{flex-shrink:0}
+
+/* Full Vector v16: precision and gradients stay within the familiar curve UI */
+.smartShadesToggle{display:flex;align-items:center;gap:10px;font-weight:750;font-size:13px;margin:14px 0 6px;color:#d6fff6}
+.smartShadesToggle input{width:18px;height:18px;accent-color:#26d6ba;flex-shrink:0}
+.microTolerance{display:block;color:#e0f2f5;font-size:13px;font-weight:700;margin-top:15px}
+.microTolerance output{float:right;color:#8df4da;font-weight:800}
+.microTolerance input{width:100%;display:block;margin-top:10px;accent-color:#2fd8be}
+.truecolorOptional{background:#123e50;color:#d1f6f0;border:1px solid #5a8696;border-radius:9px;padding:11px 13px;font-weight:750;min-height:42px;cursor:pointer}
+.truecolorOptional:disabled{opacity:.45;cursor:not-allowed}
+.truecolorCaption{font-size:12px;line-height:1.55;color:#afc1d4;margin:11px 0 0}
