@@ -84,8 +84,9 @@ test("homepage loads both modules and visible analysis controls",()=>{
    "colorDiffPreview","edgeDiffPreview","autoTuneResults","diffZoom","downloadDiffPng"]){
    assert.match(html,new RegExp('id="'+id+'"'));
  }
- assert.match(html,/vector-diff\.js\?v=vector14/);
- assert.match(html,/vector-autotune\.js\?v=vector14/);
+ assert.match(html,/vector-diff\.js\?v=vector15/);
+ assert.match(html,/vector-autotune\.js\?v=vector15/);
+ assert.match(html,/truecolor-vector\.js\?v=vector15/);
  assert.match(js,/window\.VectorDiff\.compare\(/);
  assert.match(js,/window\.VectorAutotune\.run\(/);
  assert.match(js,/function getVectorReference\(/);
