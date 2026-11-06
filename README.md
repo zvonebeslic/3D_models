@@ -53,12 +53,12 @@ GitHub Actions pokreće ove provjere nakon relevantnih promjena.
 
 Nekadašnji algoritam je **uvijek** stvarao 48 skupina boja i neovisno ocrtavao piksele iz svake skupine. Na gotovo crnoj fotografiji s kompresijskim šumom to je stvaralo desetke tisuća SVG putanja, bijele točkice i nazubljene obrise.
 
-Novi \`fullvector.js\` sada:
+Novi `fullvector.js` sada:
 1. Najprije vektorizira **cjelovitu siluetu logotipa** iz maske vidljivosti (alfa-kanal kad postoji) kao jednu osnovnu SVG površinu, uz podpikselno nalaženje granica i prilagodbu Bézierovih krivulja.
 2. Boje pronalazi iz **učestalih unutarnjih piksela**, ne iz najrjeđih ekstrema, pa slične tamne nijanse ne pretvara u zasebne oblike.
 3. Pomoću podesivog uklanjanja šuma odbacuje usitnjene promjene boje unutar punih površina i čuva razmjerno velike obojene regije.
-4. U SVG slojeve dodaje samo druge stvarne boje, dok transparentne unutarnje rupe ostaju otvorene zahvaljujući \`fill-rule="evenodd"\`.
-5. Čuva stvarne \`<path>\` vektore, bez ugrađene rasterizirane slike.
+4. U SVG slojeve dodaje samo druge stvarne boje, dok transparentne unutarnje rupe ostaju otvorene zahvaljujući `fill-rule="evenodd"`.
+5. Čuva stvarne `<path>` vektore, bez ugrađene rasterizirane slike.
 
 Na početnoj stranici postoje dva podešavanja: maksimalan broj boja (1–16) i uklanjanje šuma (0–100%). To su izbori u **Full Vector** načinu rada, odvojeni od **Trace Studija**. Prejako uklanjanje šuma može izgubiti namjerno sitne detalje, a preslabo može sačuvati neželjenu kompresiju. Za najbolju vjernost koristi izvorni transparentni PNG.
 
@@ -77,7 +77,7 @@ Eksperimentalni image-to-3D kod i lokalni AI server nalaze se u starijim datotek
 ## Full Vector v8 · segmentna analiza i uklanjanje mikroartefakata
 
 Nadograđena je **postojeća početna stranica** (gumb FULL VECTOR SVG), ne samo izdvojeni Trace Studio.
-Novi modul \`vector-cleanup.js\` najprije analizira povezane površine, uklanja odvojene mikro-otoke i zatvara samo male, potpuno **zatvorene** rupice. Rubni i veći otvoreni prostori ne diraju se. Po želji je moguće uključiti konzervativno popravljanje pojedinačnih sitnih udubljenja.
+Novi modul `vector-cleanup.js` najprije analizira povezane površine, uklanja odvojene mikro-otoke i zatvara samo male, potpuno **zatvorene** rupice. Rubni i veći otvoreni prostori ne diraju se. Po želji je moguće uključiti konzervativno popravljanje pojedinačnih sitnih udubljenja.
 
 Svaki povezani segment se lokalno izdvaja iz očišćene maske, zajedno s pripadnom izvornom prozirnošću, a njegova se kontura može ponovno računati na interpoliranom 1×/2×/3× polju. Koordinate se zatim vraćaju u originalni sustav: **nema šavova između umjetnih pločica**. Za velike segmente sustav se automatski vraća na 1× radi memorije. Interpolacija ne stvara novu izvornu informaciju niti jamči geometrijsku točnost od 0,000001 px.
 
