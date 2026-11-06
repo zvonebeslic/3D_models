@@ -23,6 +23,12 @@ async function prepare(){
     for(let n=0;n<N;n++)mask[n]=p[n*4+3]>=(allShades?1:24)?1:0;
     return applyMask();
   }
+  // Preserve every decoded RGB pixel in opaque JPEG/PNG when requested.
+  // Automatic background removal is an informed choice, not a hidden loss.
+  if($('#vectorMode').value!=='curves'&&$('#keepSourceBackground').checked){
+    mask.fill(1);
+    return applyMask();
+  }
   // Never mark EVERY border pixel as background: the logo may touch image edges.
   // Find actual border-connected low-contrast background pixels first.
   if(!window.TraceCore?._test?.sourceMask)throw Error('Modul za analizu pozadine nije učitan.');
@@ -181,6 +187,7 @@ $('#noiseReduction').addEventListener('input',()=>$('#noiseReductionLabel').text
 function syncCleanupOptions(){
   const classic=$('#vectorMode').value==='curves';
   $('#classicControls').classList.toggle('hidden',!classic);
+  $('#keepSourceBackground').disabled=classic;
   const mode=$('#vectorMode').value;
   $('#vectorModeHint').textContent=mode==='exact'?
     'SVAKA RGBA nijansa iz izvornog rastera ostaje zasebna. Nema ugrađenog PNG-a, palete ni zaglađivanja. Pri velikom zumu vide se izvorni pikseli.':
@@ -193,6 +200,13 @@ function syncCleanupOptions(){
   $('#edgeSmoothness').disabled=!on;
   $('#segmentScale').disabled=!on;
 }
+$('#keepSourceBackground').addEventListener('change',()=>{
+  imgData=null;mask=null;svgText='';
+  resultCard.classList.add('hidden');
+  bgCard.classList.add('hidden');
+  $('#compareSvg').disabled=true;
+  $('#autoTuneSvg').disabled=true;
+});
 $('#vectorMode').addEventListener('change',()=>{
   // A mode change must reload the original to avoid reusing downsampled data
   // or dropping low-opacity pixels by the previous mode's mask threshold.
