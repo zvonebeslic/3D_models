@@ -117,3 +117,29 @@ test("page makes exact truecolor the default and retains legacy curve option",()
  assert.match(controller,/window\.TrueColorVector\(mask,imgData,W,H/);
  assert.match(controller,/const options=currentVectorOptions\(\)/);
 });
+
+test("autotune considers exact all-color, micro-contour and classic curve alternatives",()=>{
+ require("../vector-autotune.js");
+ const a=globalThis.VectorAutotune.candidateSettings({
+   mode:"exact",maxColors:12,denoise:70,edgeSmoothness:65,
+   minIsland:6,minHole:14,segmentScale:2,ultraCleanup:true
+ });
+ assert.ok(a.some(x=>x.settings.mode==="exact"));
+ assert.ok(a.some(x=>x.settings.mode==="micro"));
+ assert.ok(a.some(x=>x.settings.mode==="curves"));
+ assert.ok(a.length>=8);
+});
+test("background may be preserved in truecolor without implicit foreground detection",()=>{
+ const fs=require("node:fs"),path=require("node:path");
+ const html=fs.readFileSync(path.join(__dirname,"../index.html"),"utf8");
+ const script=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
+ assert.match(html,/id="keepSourceBackground"/);
+ assert.match(script,/mask\.fill\(1\)/);
+ assert.match(script,/imgData=null;mask=null;svgText=''/);
+});
+test("truecolor processing refuses silent pixel downscaling",()=>{
+ const fs=require("node:fs"),path=require("node:path");
+ const script=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
+ assert.match(script,/if\(\$\('#vectorMode'\)\.value!=='curves'\)throw Error/);
+ assert.match(script,/više od 10 MP/);
+});
