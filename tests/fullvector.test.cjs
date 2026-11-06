@@ -21,7 +21,8 @@ test("flat black shape is one color and one vector contour",()=>{
   assert.equal(result.colors,1);
   assert.equal(result.paths,1);
   assert.equal((result.svg.match(/<path /g)||[]).length,1);
-  assert.match(result.svg,/ C/);
+  assert.ok(result.segments>=4);
+  assert.ok(result.segments<30,"rectangle should use very few genuine SVG segments");
 });
 test("subtle near-black noise does not generate thousands of extra paths",()=>{
   const img=make(320,240,(x,y)=>{
@@ -32,7 +33,7 @@ test("subtle near-black noise does not generate thousands of extra paths",()=>{
   const result=vector(img);
   assert.equal(result.colors,1);
   assert.equal(result.paths,1);
-  assert.ok(result.points<1800);
+  assert.ok(result.segments<60,"tiny shade noise must not create many final SVG segments");
 });
 test("isolated bright JPG-style noise is not turned into white confetti",()=>{
   const img=make(320,240,(x,y)=>{
