@@ -7,6 +7,13 @@
       <option value="curves">Klasične Bézierove krivulje · sažeta paleta</option>
     </select>
     <small id="vectorModeHint">Doslovno preslikava svaki vidljivi izvorni piksel u stvarne SVG putanje bez ugrađenog rastera. Svaka boja i svaka prozirnost ostaju različite. U velikom zumu vide se izvorni pikseli, a datoteka može biti velika.</small>
+    <label class="microScaleControl" for="microScale">Lokalno praćenje mikroobrisa
+      <select id="microScale">
+        <option value="1">1× · bez interpolacije</option>
+        <option value="2" selected>2× · precizni rubovi</option>
+        <option value="3">3× · dubinska analiza mikrodetalja</option>
+      </select>
+    </label>
     <label class="retainBackground"><input type="checkbox" id="keepSourceBackground"> Zadrži sve izvorne piksele, uključujući pozadinu</label>
     <small class="preserveHint">Za JPG/PNG kada ne želiš automatsko uklanjanje pozadine. Ova opcija čuva sve stvarne nijanse originalne slike, uključujući pozadinu.</small>
     <p class="precisionNotice">TRUECOLOR čuva svaku nijansu koja stvarno postoji u PNG-u ili dekodiranom JPG-u. Ne može iz mutnog JPG-a pogoditi izgubljene originalne krivulje. MICRO način dodaje preciznu vektorsku granicu, ali mijenja rubove i nije strogo 1:1.</p>
