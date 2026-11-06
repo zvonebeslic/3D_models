@@ -77,6 +77,38 @@ function sampleAt(src,w,h,x,y){
       b=src[y1*w+x0]*(1-tx)+src[y1*w+x1]*tx;
   return Math.round(a*(1-ty)+b*ty);
 }
+// Separable Gaussian filter of alpha/coverage, in ORIGINAL PIXEL coordinates.
+// Applied before local 2x/3x interpolation. Does not touch the source bitmap.
+// A halfway (128) isoline on this smooth confidence field reduces raster spikes.
+function smoothCoverage(source,w,h,strength){
+  var amount=clamp(Number(strength)||0,0,100);
+  if(amount<=0||w<2||h<2)return source;
+  var sigma=amount*.022; // 65 => 1.43 native pixels, 100 => 2.2 pixels
+  var radius=Math.max(1,Math.ceil(sigma*2.5)),weights=[],sum=0;
+  for(var i=-radius;i<=radius;i++){
+    var q=Math.exp(-(i*i)/(2*sigma*sigma));
+    weights.push(q);sum+=q;
+  }
+  for(var i=0;i<weights.length;i++)weights[i]/=sum;
+  var row=new Uint8Array(w*h),out=new Uint8Array(w*h);
+  for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+    var sumR=0;
+    for(var k=-radius;k<=radius;k++){
+      var col=x+k;
+      if(col>=0&&col<w)sumR+=source[y*w+col]*weights[k+radius];
+    }
+    row[y*w+x]=Math.round(sumR);
+  }
+  for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+    var sumC=0;
+    for(var k=-radius;k<=radius;k++){
+      var line=y+k;
+      if(line>=0&&line<h)sumC+=row[line*w+x]*weights[k+radius];
+    }
+    out[y*w+x]=Math.round(sumC);
+  }
+  return out;
+}
 function traceComponents(mask,coverage,w,h,opts){
   opts=opts||{};
   var requested=clamp(Math.round(Number(opts.zoom)||1),1,3);
@@ -100,7 +132,10 @@ function traceComponents(mask,coverage,w,h,opts){
       var original=queue[i],x=original%w,y=Math.floor(original/w);
       local[(y-top)*cw+x-left]=coverage[original];
     }
-    var field=local,fw=cw,fh=ch;
+    // The spatial filter is confined to the component's own padded crop,
+    // so other letter shapes cannot bleed into one another.
+    var smoothed=smoothCoverage(local,cw,ch,opts.edgeSmoothness);
+    var field=smoothed,fw=cw,fh=ch;
     if(factor>1){
       fw=cw*factor;fh=ch*factor;
       field=new Uint8Array(fw*fh);
@@ -108,7 +143,7 @@ function traceComponents(mask,coverage,w,h,opts){
         var py=(yy+.5)/factor-.5;
         for(var xx=0;xx<fw;xx++){
           var px=(xx+.5)/factor-.5;
-          field[yy*fw+xx]=sampleAt(local,cw,ch,px,py);
+          field[yy*fw+xx]=sampleAt(smoothed,cw,ch,px,py);
         }
       }
     }
@@ -125,5 +160,5 @@ function traceComponents(mask,coverage,w,h,opts){
   });
   return{loops:paths,stats:details};
 }
-root.VectorCleanup={clean:clean,traceComponents:traceComponents,_test:{walk:walk,sampleAt:sampleAt}};
+root.VectorCleanup={clean:clean,traceComponents:traceComponents,_test:{walk:walk,sampleAt:sampleAt,smoothCoverage:smoothCoverage}};
 })(typeof window!=="undefined"?window:globalThis);
