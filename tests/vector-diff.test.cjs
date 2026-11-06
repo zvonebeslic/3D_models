@@ -81,14 +81,15 @@ test("homepage loads both modules and visible analysis controls",()=>{
  const js=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
  for(const id of ["compareSvg","autoTuneSvg","diffThreshold","edgeTolerance",
    "diffPanel","diffStats","originalDiffPreview","svgDiffPreview",
-   "colorDiffPreview","edgeDiffPreview","autoTuneResults"]){
+   "colorDiffPreview","edgeDiffPreview","autoTuneResults","diffZoom","downloadDiffPng"]){
    assert.match(html,new RegExp('id="'+id+'"'));
  }
- assert.match(html,/vector-diff\.js\?v=vector13/);
- assert.match(html,/vector-autotune\.js\?v=vector13/);
+ assert.match(html,/vector-diff\.js\?v=vector14/);
+ assert.match(html,/vector-autotune\.js\?v=vector14/);
  assert.match(js,/window\.VectorDiff\.compare\(/);
  assert.match(js,/window\.VectorAutotune\.run\(/);
  assert.match(js,/function getVectorReference\(/);
+ assert.match(js,/function updateDiffZoom\(/);
 });
 
 test("edge comparison detects moved internal red-blue color boundaries",()=>{
