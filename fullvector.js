@@ -203,7 +203,10 @@ function FullVector(mask,img,W,H,opts){
   // Large components safely fall back to 1x rather than exhausting RAM.
   var zoom=cleanupOn?Math.round(clamp(Number(opts.segmentScale)||2,1,3)):1;
   var edgeSmoothness=cleanupOn?clamp(opts.edgeSmoothness==null?65:Number(opts.edgeSmoothness),0,100):0;
-  var curveTolerance=.52+edgeSmoothness*.0055;
+  // Micro detail is controlled independently of smoothing. Smaller fitting
+  // tolerance retains more real contour vertices (not pixel rectangles).
+  var curveTolerance=opts.curveTolerance==null?Math.max(.18,.28+edgeSmoothness*.001):
+    clamp(Number(opts.curveTolerance),.18,1.5);
   var main=cleanup.traceComponents(foreground,coverage,W,H,{
     zoom:zoom,maxLocalPixels:2400000,minArea:.25,edgeSmoothness:edgeSmoothness
   });
@@ -212,7 +215,7 @@ function FullVector(mask,img,W,H,opts){
 
   var strength=clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
   var palette=paletteFor(foreground,pix,W,H,hasAlpha,
-    clamp(Number(opts.maxColors)||12,1,16),28+strength*.43);
+    clamp(Number(opts.maxColors)||12,1,64),28+strength*.43);
   var labels=classify(foreground,pix,W,H,palette);
   var passes=strength<10?0:strength<45?1:2;
   if(palette.length>1&&passes)labels=majorityFilter(labels,W,H,passes);
@@ -232,7 +235,19 @@ function FullVector(mask,img,W,H,opts){
     return '<path d="'+d+'" fill="'+color+'" fill-rule="evenodd" stroke="'+color+
       '" stroke-width="0.10" stroke-linecap="round" stroke-linejoin="round" paint-order="stroke fill"/>';
   }
-  var body=[shapeTag(silhouette.d,hex(palette[base]))];
+  // Fit gradients from every actual source RGB sample *within* each palette
+  // region, so anti-aliased shading remains smooth rather than turning into
+  // hundreds of tiny color islands. Never change the original silhouette.
+  var smart=root.VectorSmartColor&&opts.smartShades!==false;
+  var defs=[],gradientCount=0;
+  function paintFor(k){
+    if(!smart)return hex(palette[k]);
+    var grad=root.VectorSmartColor.fitRegion(pix,labels,W,H,k,palette[k],k);
+    if(!grad)return hex(palette[k]);
+    defs.push(grad.defs);gradientCount++;
+    return grad.paint;
+  }
+  var body=[shapeTag(silhouette.d,paintFor(base))];
   var totalPaths=silhouette.paths,totalPoints=silhouette.points,
       totalSegments=silhouette.segments,colors=1,
       components=main.stats.components,refined=main.stats.refined,
@@ -255,9 +270,9 @@ function FullVector(mask,img,W,H,opts){
     var local=cleanup.traceComponents(region,regionCoverage,W,H,{
       zoom:zoom,maxLocalPixels:1700000,minArea:.25,edgeSmoothness:edgeSmoothness
     });
-    var vector=toPath(local.loops,.60+edgeSmoothness*.0045);
+    var vector=toPath(local.loops,Math.max(.18,curveTolerance+.035));
     if(!vector.paths)continue;
-    body.push(shapeTag(vector.d,hex(palette[k])));
+    body.push(shapeTag(vector.d,paintFor(k)));
     totalPaths+=vector.paths;totalPoints+=vector.points;
     totalSegments+=vector.segments;colors++;
     components+=local.stats.components;
@@ -265,7 +280,8 @@ function FullVector(mask,img,W,H,opts){
     fallback+=local.stats.fallback;
   }
   var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+
-    '" viewBox="0 0 '+W+' '+H+'" shape-rendering="geometricPrecision">'+body.join("")+'</svg>';
+    '" viewBox="0 0 '+W+' '+H+'" shape-rendering="geometricPrecision">'+
+    (defs.length?'<defs>'+defs.join("")+'</defs>':"")+body.join("")+'</svg>';
   return{svg:svg,colors:colors,paths:totalPaths,points:totalPoints,
     segments:totalSegments,noiseRemoved:removedColor+cleaned.removedIslands,
     baseColor:hex(palette[base]),sourceColors:palette.length,hasAlpha:hasAlpha,
@@ -273,7 +289,8 @@ function FullVector(mask,img,W,H,opts){
     microHolesFilled:cleaned.filledHoleCount,
     microHolePixels:cleaned.filledHoles,
     microNotchesRepaired:cleaned.correctedNotches,
-    components:components,refined:refined,fallback:fallback,edgeSmoothness:edgeSmoothness};
+    components:components,refined:refined,fallback:fallback,edgeSmoothness:edgeSmoothness,
+    gradientCount:gradientCount,curveTolerance:curveTolerance};
 }
 root.FullVector=FullVector;
 root.FullVectorV5={paletteFor:paletteFor,classify:classify,majorityFilter:majorityFilter,
