@@ -6,6 +6,7 @@ on:
       - "trace-core.js"
       - "trace-fit.js"
       - "fullvector.js"
+      - "vector-smart-color.js"
       - "vector-diff.js"
       - "vector-autotune.js"
       - "truecolor-vector.js"
@@ -23,6 +24,7 @@ on:
       - "trace-core.js"
       - "trace-fit.js"
       - "fullvector.js"
+      - "vector-smart-color.js"
       - "vector-diff.js"
       - "vector-autotune.js"
       - "truecolor-vector.js"
@@ -48,6 +50,7 @@ jobs:
       - run: node --check trace-app.js
       - run: node --check vector.js
       - run: node --check fullvector.js
+      - run: node --check vector-smart-color.js
       - run: node --check vector-diff.js
       - run: node --check vector-autotune.js
       - run: node --check truecolor-vector.js
