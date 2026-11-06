@@ -54,14 +54,14 @@ function TrueColorVector(mask,image,w,h,opts){
   var mode=opts.mode==="micro"?"micro":"exact";
   // Merge consecutive same-RGBA pixels in a scanline and identical runs
   // through adjacent rows, WITHOUT merging different shades or alpha values.
-  var active=new Map(),groups=new Map(),shapes=0,sourcePixels=0,characterCount=0;
+  var active=new Map(),groups=new Map(),shapes=0,sourcePixels=0,characterCount=0,hasAlpha=false;
   function flush(rect){
     shapes++;
     if(shapes>maxShapes)throw Error("SVG bi zahtijevao više od "+
       maxShapes.toLocaleString("hr-HR")+
       " vektorskih oblika. Nijanse nisu spojene ni izbrisane. Probaj manji original.");
     var group=groups.get(rect.keyColor);
-    if(!group){group=[];groups.set(rect.keyColor,group);}
+    if(!group){group=[];groups.set(rect.keyColor,group);characterCount+=85;}
     // Path contains one closed native-pixel rectangle per maximal run;
     // all coordinates are integers, so every displayed pixel is accounted for.
     var command="M"+rect.x+" "+rect.y+"h"+rect.width+
@@ -77,6 +77,7 @@ function TrueColorVector(mask,image,w,h,opts){
       var at=y*w+x,index=at*4;
       if(!mask[at]||p[index+3]===0){x++;continue;}
       var key=rgbaKey(p,index),start=x;
+      if(p[index+3]!==255)hasAlpha=true;
       x++;sourcePixels++;
       while(x<w){
         var j=y*w+x,k=j*4;
@@ -131,7 +132,7 @@ function TrueColorVector(mask,image,w,h,opts){
     '" shape-rendering="crispEdges">'+defs+open+paths.join("")+close+'</svg>';
   return{svg,mode:type,colors,uniqueRGBA:colors,paths:paths.length+(clip?clip.paths:0),
     shapes,segments:shapes*4,points:microPoints,sourcePixels,
-    hasAlpha:Array.from(groups.keys()).some(x=>(x&255)!==255),
+    hasAlpha:hasAlpha,
     microPaths:clip?clip.paths:0,bytes:svg.length,
     exactPixels:type==="exact",edgeRefined:type==="micro"};
 }
