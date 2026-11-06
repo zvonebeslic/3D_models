@@ -36,15 +36,27 @@ function compareData(a,b,w,h,opts) {
       heat[k+3]=Math.round(95+155*t);
     }
   }
-  function edge(binary,dest){
+  // Edges include silhouette boundaries AND high-contrast color boundaries
+  // inside an opaque logo. Alpha-only edges would miss colored lettering.
+  const contrastThreshold=Math.max(32,threshold*2.5);
+  function edge(binary,dest,rgba){
+    function contrast(i,j){
+      if(!binary[i]||!binary[j])return false;
+      const a=i*4,b=j*4;
+      const dr=rgba[a]-rgba[b],dg=rgba[a+1]-rgba[b+1],
+            db=rgba[a+2]-rgba[b+2];
+      return Math.sqrt((dr*dr+dg*dg+db*db)/3)>contrastThreshold;
+    }
     for(let y=0;y<h;y++)for(let x=0;x<w;x++){
       const i=y*w+x,m=binary[i];
-      if((x>0&&binary[i-1]!==m)||(x<w-1&&binary[i+1]!==m)||
-         (y>0&&binary[i-w]!==m)||(y<h-1&&binary[i+w]!==m)||
-         (x===0&&m)||(x===w-1&&m)||(y===0&&m)||(y===h-1&&m))dest[i]=1;
+      if((x>0&&(binary[i-1]!==m||contrast(i,i-1)))||
+        (x<w-1&&(binary[i+1]!==m||contrast(i,i+1)))||
+        (y>0&&(binary[i-w]!==m||contrast(i,i-w)))||
+        (y<h-1&&(binary[i+w]!==m||contrast(i,i+w)))||
+        (x===0&&m)||(x===w-1&&m)||(y===0&&m)||(y===h-1&&m))dest[i]=1;
     }
   }
-  edge(alphaA,outlineA);edge(alphaB,outlineB);
+  edge(alphaA,outlineA,A);edge(alphaB,outlineB,B);
   // Manhattan distance to the nearest edge. 2-pass dynamic programming:
   // exact for 4-connected grid and fast enough for large images on mobile.
   function distance(edges) {
