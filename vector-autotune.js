@@ -43,7 +43,7 @@ function maskedDownsample(source,w,h,maxPixels){
   const dims=D.chooseDimensions(w,h,maxPixels);
   const image=D._test.resizeReference(source,w,h,dims.width,dims.height);
   const mask=new Uint8Array(dims.width*dims.height);
-  for(let i=0;i<mask.length;i++)mask[i]=image.data[i*4+3]>=24?1:0;
+  for(let i=0;i<mask.length;i++)mask[i]=image.data[i*4+3]>0?1:0;
   return{img:image,mask,width:dims.width,height:dims.height};
 }
 async function run(source,w,h,base,opts){
