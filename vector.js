@@ -1,10 +1,16 @@
 const $=s=>document.querySelector(s),input=$('#imageInput'),drop=$('#drop'),preview=$('#preview'),previewWrap=$('#previewWrap'),remove=$('#removeImage'),removeBg=$('#removeBg'),run=$('#vectorize'),status=$('#status'),bgCard=$('#bgResultCard'),bgCanvas=$('#bgCanvas'),bgctx=bgCanvas.getContext('2d',{willReadFrequently:true}),cleanPreview=$('#cleanPreview'),resultCard=$('#resultCard'),svgResult=$('#svgResult'),stats=$('#stats'),zoom=$('#zoom'),zoomValue=$('#zoomValue');let url=null,imgData=null,mask=null,W=0,H=0,svgText='';
-function load(f){if(!f||!f.type?.startsWith('image/'))return;if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(f);preview.onload=()=>{drop.classList.add('hidden');previewWrap.classList.remove('hidden');removeBg.disabled=false;run.disabled=false;bgCard.classList.add('hidden');resultCard.classList.add('hidden');status.classList.add('hidden');imgData=mask=null};preview.src=url}input.onchange=e=>load(e.target.files?.[0]);remove.onclick=()=>location.reload();async function image(){return new Promise((r,j)=>{const i=new Image();i.onload=()=>r(i);i.onerror=j;i.src=url})}
+function load(f){if(!f||!f.type?.startsWith('image/'))return;if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(f);preview.onload=()=>{drop.classList.add('hidden');previewWrap.classList.remove('hidden');removeBg.disabled=false;run.disabled=false;bgCard.classList.add('hidden');resultCard.classList.add('hidden');status.classList.add('hidden');imgData=mask=null;svgText='';if(svgPreviewUrl){URL.revokeObjectURL(svgPreviewUrl);svgPreviewUrl=null}};preview.src=url}input.onchange=e=>load(e.target.files?.[0]);remove.onclick=()=>location.reload();async function image(){return new Promise((r,j)=>{const i=new Image();i.onload=()=>r(i);i.onerror=j;i.src=url})}
 async function prepare(){
   const im=await image();
   W=im.naturalWidth||im.width;H=im.naturalHeight||im.height;
   const max=10000000;
-  if(W*H>max){const q=Math.sqrt(max/(W*H));W=Math.max(1,Math.round(W*q));H=Math.max(1,Math.round(H*q))}
+  if(W*H>max){
+    if($('#vectorMode').value!=='curves')throw Error(
+      'TRUECOLOR i MICRO čuvaju izvornu rezoluciju bez smanjivanja. Izvor ima '+
+      W+' × '+H+' piksela (više od 10 MP). Učitaj manji izvor ili odaberi klasične krivulje.'
+    );
+    const q=Math.sqrt(max/(W*H));W=Math.max(1,Math.round(W*q));H=Math.max(1,Math.round(H*q));
+  }
   const c=document.createElement('canvas');c.width=W;c.height=H;
   const x=c.getContext('2d',{willReadFrequently:true});
   x.drawImage(im,0,0,W,H);imgData=x.getImageData(0,0,W,H);
@@ -13,7 +19,8 @@ async function prepare(){
   let hasAlpha=false;
   for(let n=0;n<N;n++)if(p[n*4+3]<245){hasAlpha=true;break}
   if(hasAlpha){
-    for(let n=0;n<N;n++)mask[n]=p[n*4+3]>=24?1:0;
+    const allShades=$('#vectorMode').value!=='curves';
+    for(let n=0;n<N;n++)mask[n]=p[n*4+3]>=(allShades?1:24)?1:0;
     return applyMask();
   }
   // Never mark EVERY border pixel as background: the logo may touch image edges.
@@ -42,6 +49,7 @@ function applyMask(){const d=new ImageData(new Uint8ClampedArray(imgData.data),W
 removeBg.onclick=async()=>{removeBg.disabled=true;status.classList.remove('hidden');status.textContent='Analiziram vanjsku pozadinu i čuvam zatvorene detalje loga…';try{await prepare();bgCard.classList.remove('hidden');status.textContent='✓ Pozadina uklonjena.';bgCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri uklanjanju pozadine.'}finally{removeBg.disabled=false}};$('#downloadPng').onclick=()=>bgCanvas.toBlob(b=>{if(!b)return;const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='logo-transparent.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)});
 function currentVectorOptions(){
   return {
+    mode:$('#vectorMode').value,
     maxColors:Number($('#vectorColors').value),
     denoise:Number($('#noiseReduction').value),
     ultraCleanup:$('#ultraCleanup').checked,
@@ -52,6 +60,11 @@ function currentVectorOptions(){
   };
 }
 function setVectorOptions(settings){
+  const previous=$('#vectorMode').value;
+  if(settings.mode){
+    $('#vectorMode').value=settings.mode;
+    if(previous!==settings.mode){imgData=null;mask=null;}
+  }
   $('#vectorColors').value=String(settings.maxColors);
   $('#noiseReduction').value=String(settings.denoise);
   $('#ultraCleanup').checked=Boolean(settings.ultraCleanup);
@@ -72,16 +85,34 @@ function getVectorReference(){
   for(let i=0;i<mask.length;i++)if(!mask[i])copy[i*4+3]=0;
   return new ImageData(copy,W,H);
 }
+let svgPreviewUrl=null;
 function showVector(b){
   svgText=b.svg;
-  svgResult.innerHTML=svgText;
-  stats.textContent=b.colors.toLocaleString()+' boja • '+
-    b.paths.toLocaleString()+' kontura • '+
-    b.segments.toLocaleString()+' SVG segmenata • '+
-    b.points.toLocaleString()+' rubnih točaka • '+
+  if(svgPreviewUrl){URL.revokeObjectURL(svgPreviewUrl);svgPreviewUrl=null;}
+  svgResult.replaceChildren();
+  // Do not inject hundreds of thousands of SVG nodes directly into the UI.
+  // Browsers can render the complete truecolor file as a Blob-backed <img>.
+  if(svgText.length>600000){
+    svgPreviewUrl=URL.createObjectURL(new Blob([svgText],{type:'image/svg+xml;charset=utf-8'}));
+    const view=document.createElement('img');
+    view.src=svgPreviewUrl;view.alt='SVG vektor s originalnim RGBA nijansama';
+    view.style.display='block';
+    svgResult.appendChild(view);
+  }else svgResult.innerHTML=svgText;
+  if(b.mode==='exact'||b.mode==='micro'){
+    stats.textContent=(b.mode==='exact'?'TRUECOLOR 1:1':'TRUECOLOR MICRO')+' • '+
+      b.uniqueRGBA.toLocaleString('hr-HR')+' različitih RGBA nijansi • '+
+      b.sourcePixels.toLocaleString('hr-HR')+' sačuvanih vidljivih piksela • '+
+      b.shapes.toLocaleString('hr-HR')+' vektorskih oblika • '+
+      b.paths.toLocaleString('hr-HR')+' SVG putanja • '+
+      b.bytes.toLocaleString('hr-HR')+' znakova u SVG-u'+
+      (b.mode==='micro'?' • '+b.microPaths+' dodatnih rubnih kontura':' • bez pojednostavljivanja boja ili prozirnosti');
+  }else stats.textContent=b.colors.toLocaleString('hr-HR')+' boja • '+
+    b.paths.toLocaleString('hr-HR')+' kontura • '+
+    b.segments.toLocaleString('hr-HR')+' SVG segmenata • '+
+    b.points.toLocaleString('hr-HR')+' rubnih točaka • '+
     b.microIslandsRemoved+' uklonjenih mrlja • '+
-    b.microHolesFilled+' zatvorenih rupica • '+
-    b.refined+' lokalno obrađenih segmenata';
+    b.microHolesFilled+' zatvorenih rupica';
   $('#diffPanel').classList.add('hidden');
   $('#compareSvg').disabled=false;
   $('#autoTuneSvg').disabled=false;
@@ -92,7 +123,17 @@ async function generateVector(){
   if(!imgData||!mask)await prepare();
   if(typeof window.FullVector!=='function')throw Error('Full Vector modul nije učitan.');
   await new Promise(resolve=>setTimeout(resolve,20));
-  const b=window.FullVector(mask,imgData,W,H,currentVectorOptions());
+  const options=currentVectorOptions();
+  let b;
+  if(options.mode==='curves'){
+    b=window.FullVector(mask,imgData,W,H,options);
+  }else{
+    if(typeof window.TrueColorVector!=='function')throw Error('TRUECOLOR modul nije učitan.');
+    b=window.TrueColorVector(mask,imgData,W,H,{
+      mode:options.mode,microScale:options.segmentScale,
+      curveTolerance:.18
+    });
+  }
   showVector(b);
   return b;
 }
@@ -109,7 +150,7 @@ run.onclick=async()=>{
   }finally{run.disabled=false;}
 };
 
-function applyZoom(){zoomValue.textContent=zoom.value+'%';const s=svgResult.querySelector('svg');if(s){s.style.width=zoom.value+'%';s.style.height='auto';s.style.maxWidth='none'}}zoom.oninput=applyZoom;function saveFullSVG(){
+function applyZoom(){zoomValue.textContent=zoom.value+'%';const s=svgResult.querySelector('svg, img');if(s){s.style.width=zoom.value+'%';s.style.height='auto';s.style.maxWidth='none'}}zoom.oninput=applyZoom;function saveFullSVG(){
   if(!svgText){status.classList.remove('hidden');status.textContent='Prvo izradi SVG.';return}
   try{
     const url=URL.createObjectURL(new Blob([svgText],{type:'image/svg+xml;charset=utf-8'}));
@@ -138,12 +179,30 @@ $('#vectorColors').addEventListener('input',()=>$('#vectorColorsLabel').textCont
 $('#noiseReduction').addEventListener('input',()=>$('#noiseReductionLabel').textContent=$('#noiseReduction').value+'%');
 
 function syncCleanupOptions(){
-  const on=$('#ultraCleanup').checked;
+  const classic=$('#vectorMode').value==='curves';
+  $('#classicControls').classList.toggle('hidden',!classic);
+  const mode=$('#vectorMode').value;
+  $('#vectorModeHint').textContent=mode==='exact'?
+    'SVAKA RGBA nijansa iz izvornog rastera ostaje zasebna. Nema ugrađenog PNG-a, palete ni zaglađivanja. Pri velikom zumu vide se izvorni pikseli.':
+    mode==='micro'?
+    'Svaka izvorna RGBA nijansa ostaje različita, uz dodatne precizne rubne konture. Rubovi su rekonstruirani i zato nisu 1:1 identični rasteru.':
+    'Klasične SVG Bézierove krivulje s ograničenom paletom boja, za jednostavnije logotipe i manje datoteke.';
+  const on=classic&&$('#ultraCleanup').checked;
   $('#minIsland').disabled=!on;
   $('#minHole').disabled=!on;
   $('#edgeSmoothness').disabled=!on;
   $('#segmentScale').disabled=!on;
 }
+$('#vectorMode').addEventListener('change',()=>{
+  // A mode change must reload the original to avoid reusing downsampled data
+  // or dropping low-opacity pixels by the previous mode's mask threshold.
+  imgData=null;mask=null;svgText='';
+  resultCard.classList.add('hidden');
+  bgCard.classList.add('hidden');
+  $('#compareSvg').disabled=true;
+  $('#autoTuneSvg').disabled=true;
+  syncCleanupOptions();
+});
 $('#ultraCleanup').addEventListener('change',syncCleanupOptions);
 $('#minIsland').addEventListener('input',()=>$('#minIslandLabel').textContent=$('#minIsland').value+' px²');
 $('#minHole').addEventListener('input',()=>$('#minHoleLabel').textContent=$('#minHole').value+' px²');
