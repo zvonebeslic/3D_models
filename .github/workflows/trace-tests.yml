@@ -6,6 +6,7 @@ on:
       - "trace-core.js"
       - "trace-fit.js"
       - "fullvector.js"
+      - "vector-cleanup.js"
       - "vector.js"
       - "index.html"
       - "style.css"
@@ -40,5 +41,6 @@ jobs:
       - run: node --check trace-app.js
       - run: node --check vector.js
       - run: node --check fullvector.js
+      - run: node --check vector-cleanup.js
       - run: node --check trace-fit.js
       - run: node --test tests/*.test.cjs
