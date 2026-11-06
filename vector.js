@@ -56,6 +56,7 @@ removeBg.onclick=async()=>{removeBg.disabled=true;status.classList.remove('hidde
 function currentVectorOptions(){
   return {
     mode:$('#vectorMode').value,
+    microScale:Number($('#microScale').value),
     maxColors:Number($('#vectorColors').value),
     denoise:Number($('#noiseReduction').value),
     ultraCleanup:$('#ultraCleanup').checked,
@@ -136,7 +137,7 @@ async function generateVector(){
   }else{
     if(typeof window.TrueColorVector!=='function')throw Error('TRUECOLOR modul nije učitan.');
     b=window.TrueColorVector(mask,imgData,W,H,{
-      mode:options.mode,microScale:options.segmentScale,
+      mode:options.mode,microScale:options.microScale,
       curveTolerance:.18
     });
   }
@@ -189,6 +190,7 @@ function syncCleanupOptions(){
   $('#classicControls').classList.toggle('hidden',!classic);
   $('#keepSourceBackground').disabled=classic;
   const mode=$('#vectorMode').value;
+  $('#microScale').disabled=mode!=='micro';
   $('#vectorModeHint').textContent=mode==='exact'?
     'SVAKA RGBA nijansa iz izvornog rastera ostaje zasebna. Nema ugrađenog PNG-a, palete ni zaglađivanja. Pri velikom zumu vide se izvorni pikseli.':
     mode==='micro'?
