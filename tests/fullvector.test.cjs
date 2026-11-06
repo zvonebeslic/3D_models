@@ -82,7 +82,7 @@ test("palette/noise controls are wired to the home-page Full Vector action",()=>
   const controller=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
   assert.match(html,/id="vectorColors"/);
   assert.match(html,/id="noiseReduction"/);
-  assert.match(html,/fullvector\.js\?v=vector15/);
+  assert.match(html,/fullvector\.js\?v=vector16/);
   assert.match(controller,/window\.FullVector\(mask,imgData,W,H,options\)/);
   assert.match(controller,/confidence\[n\]<112/);
 });
