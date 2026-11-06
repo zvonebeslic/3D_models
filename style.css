@@ -20,3 +20,13 @@
 .edgeSmoothControls output{font-weight:800;color:#6be4d7}
 .edgeSmoothControls input[type="range"]{width:100%;accent-color:#2ad4c7;margin:5px 0}
 .edgeSmoothControls small{font-size:12px;line-height:1.45;color:#a2bdd0}
+
+.originalDetail{padding:14px;border:1px solid #587f8b;background:linear-gradient(115deg,#0c3338,#142238);border-radius:13px;margin-bottom:14px}
+.originalDetail>label:first-child{display:flex;align-items:center;gap:9px;color:#e7fffb;font-size:14px}
+.originalDetail input[type="checkbox"]{accent-color:#24d8c4;width:19px;height:19px}
+.originalDetail small{display:block;color:#b1c7d8;font-size:12px;line-height:1.45;margin-top:7px}
+.originalDetail .curveAccuracy{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#bfd4e8;margin-top:15px}
+.originalDetail .curveAccuracy output{color:#5debd3;font-weight:800}
+.originalDetail input[type="range"]{display:block;width:100%;accent-color:#24d8c4;margin-top:10px}
+#detailModeExplanation{display:block;color:#95d8d1;font-size:12px;margin:0 0 14px}
+.originalDetail input:disabled{opacity:.4}
