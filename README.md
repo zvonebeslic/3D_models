@@ -72,3 +72,13 @@ Dodatno je popravljen postupak uklanjanja pozadine za neprozirni JPEG/PNG: cijel
 ## Ostali dijelovi repozitorija
 
 Eksperimentalni image-to-3D kod i lokalni AI server nalaze se u starijim datotekama i mapama. GitHub Pages hosta statički frontend; zahtjevni AI inference nije dio ovog Trace Studija.
+
+
+## Full Vector v8 · segmentna analiza i uklanjanje mikroartefakata
+
+Nadograđena je **postojeća početna stranica** (gumb FULL VECTOR SVG), ne samo izdvojeni Trace Studio.
+Novi modul \`vector-cleanup.js\` najprije analizira povezane površine, uklanja odvojene mikro-otoke i zatvara samo male, potpuno **zatvorene** rupice. Rubni i veći otvoreni prostori ne diraju se. Po želji je moguće uključiti konzervativno popravljanje pojedinačnih sitnih udubljenja.
+
+Svaki povezani segment se lokalno izdvaja iz očišćene maske, zajedno s pripadnom izvornom prozirnošću, a njegova se kontura može ponovno računati na interpoliranom 1×/2×/3× polju. Koordinate se zatim vraćaju u originalni sustav: **nema šavova između umjetnih pločica**. Za velike segmente sustav se automatski vraća na 1× radi memorije. Interpolacija ne stvara novu izvornu informaciju niti jamči geometrijsku točnost od 0,000001 px.
+
+Korisnik može postaviti prag površine za uklanjanje odvojenih mrlja i zatvaranje minijaturnih rupa, kao i potpuno isključiti ULTRA čišćenje, kako bi zaštitio namjerno sitne elemente slova, interpunkcije i logotipa. Veliki otvori i oblici različitih boja imaju regresijske testove. SVG površine imaju vrlo tanku ispunu ruba iste boje (0,10 px) kako bi se smanjile anti-aliasing pukotine u preglednicima bez ugrađenog rastera.
