@@ -50,3 +50,11 @@
 .autoTuneResults th{color:#a8d0dd;font-weight:750}
 .autoTuneResults .qualityBest td{color:#a2f1e5;font-weight:850;background:#183a41}
 @media(max-width:650px){.qualityInputs,.diffGrid{grid-template-columns:1fr}.qualityTools{padding:13px}.qualityActions button{width:100%}}
+
+.diffZoomRow{display:flex;flex-wrap:wrap;align-items:center;gap:15px;margin:6px 0 17px}
+.diffZoomRow label{flex:1;min-width:160px;font-size:12px;color:#d6e5ef}
+.diffZoomRow output{font-weight:750;color:#6bdfd2;margin-left:7px}
+.diffZoomRow input{display:block;width:100%;accent-color:#25d3c4;margin-top:7px}
+.diffZoomRow button{color:#eafffa;background:#214f64;border:1px solid #4c8da1;border-radius:9px;padding:10px 14px;min-height:42px;cursor:pointer}
+.diffGrid .checker{overflow:auto;max-height:370px;justify-content:flex-start;align-items:flex-start}
+.diffGrid .checker canvas{flex-shrink:0}
