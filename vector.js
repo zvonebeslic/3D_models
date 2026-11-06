@@ -349,7 +349,7 @@ $('#autoTuneSvg').onclick=async()=>{
     const source=getVectorReference();
     const tuned=await window.VectorAutotune.run(
       source,W,H,currentVectorOptions(),{
-        maxPixels:180000,
+        maxPixels:80000,
         threshold:Number($('#diffThreshold').value),
         edgeTolerance:Number($('#edgeTolerance').value),
         onProgress:(index,total,name)=>{
