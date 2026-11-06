@@ -134,6 +134,8 @@ test("background may be preserved in truecolor without implicit foreground detec
  const html=fs.readFileSync(path.join(__dirname,"../index.html"),"utf8");
  const script=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
  assert.match(html,/id="keepSourceBackground"/);
+ assert.match(html,/id="microScale"/);
+ assert.match(script,/microScale:options\.microScale/);
  assert.match(script,/mask\.fill\(1\)/);
  assert.match(script,/imgData=null;mask=null;svgText=''/);
 });
@@ -142,4 +144,14 @@ test("truecolor processing refuses silent pixel downscaling",()=>{
  const script=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
  assert.match(script,/if\(\$\('#vectorMode'\)\.value!=='curves'\)throw Error/);
  assert.match(script,/više od 10 MP/);
+});
+
+test("micro contour scale is configurable independently of original curve controls",()=>{
+ const fs=require("node:fs"),path=require("node:path");
+ const html=fs.readFileSync(path.join(__dirname,"../index.html"),"utf8");
+ const js=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
+ assert.match(html,/<option value="3">3× · dubinska analiza mikrodetalja<\/option>/);
+ assert.match(js,/microScale:Number\(\$\('#microScale'\)\.value\)/);
+ assert.match(js,/microScale:options\.microScale/);
+ assert.match(js,/microScale'\)\.disabled=mode!=='micro'/);
 });
