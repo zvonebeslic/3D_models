@@ -202,10 +202,12 @@ function FullVector(mask,img,W,H,opts){
   // coverage field at 2x/3x. Do not upscale an already fitted SVG.
   // Large components safely fall back to 1x rather than exhausting RAM.
   var zoom=cleanupOn?Math.round(clamp(Number(opts.segmentScale)||2,1,3)):1;
+  var edgeSmoothness=cleanupOn?clamp(opts.edgeSmoothness==null?65:Number(opts.edgeSmoothness),0,100):0;
+  var curveTolerance=.52+edgeSmoothness*.0055;
   var main=cleanup.traceComponents(foreground,coverage,W,H,{
-    zoom:zoom,maxLocalPixels:2400000,minArea:.25
+    zoom:zoom,maxLocalPixels:2400000,minArea:.25,edgeSmoothness:edgeSmoothness
   });
-  var silhouette=toPath(main.loops,.52);
+  var silhouette=toPath(main.loops,curveTolerance);
   if(!silhouette.paths)throw Error("Nije prepoznata silueta. Pokušaj drugačiji izvorni PNG.");
 
   var strength=clamp(opts.denoise==null?70:Number(opts.denoise),0,100);
@@ -251,9 +253,9 @@ function FullVector(mask,img,W,H,opts){
     var regionCoverage=new Uint8Array(N);
     for(var i=0;i<N;i++)if(region[i])regionCoverage[i]=255;
     var local=cleanup.traceComponents(region,regionCoverage,W,H,{
-      zoom:zoom,maxLocalPixels:1700000,minArea:.25
+      zoom:zoom,maxLocalPixels:1700000,minArea:.25,edgeSmoothness:edgeSmoothness
     });
-    var vector=toPath(local.loops,.60);
+    var vector=toPath(local.loops,.60+edgeSmoothness*.0045);
     if(!vector.paths)continue;
     body.push(shapeTag(vector.d,hex(palette[k])));
     totalPaths+=vector.paths;totalPoints+=vector.points;
@@ -271,7 +273,7 @@ function FullVector(mask,img,W,H,opts){
     microHolesFilled:cleaned.filledHoleCount,
     microHolePixels:cleaned.filledHoles,
     microNotchesRepaired:cleaned.correctedNotches,
-    components:components,refined:refined,fallback:fallback};
+    components:components,refined:refined,fallback:fallback,edgeSmoothness:edgeSmoothness};
 }
 root.FullVector=FullVector;
 root.FullVectorV5={paletteFor:paletteFor,classify:classify,majorityFilter:majorityFilter,
