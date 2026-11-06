@@ -126,3 +126,5 @@ Automatsko podešavanje sada među kandidatima razmatra i oba TRUECOLOR načina 
 - Nema tihog smanjivanja slike za TRUECOLOR: ako original prelazi 10 milijuna piksela, alat javlja ograničenje. Velik broj jedinstvenih boja može proizvesti vrlo velik SVG; u tom slučaju alat prijavljuje ograničenja memorije bez automatskog spajanja boja.
 - Rezultat je vektorski SVG sastavljen od mnoštva oblika, ali putanje izrađene po pikselima **nisu ekvivalentne ponovno nacrtanom idealnom logotipu** s nekoliko matematički savršenih krivulja. Za tisak na velikom formatu može biti potrebna profesionalna ručna rekonstrukcija.
 - Programski testovi provjeravaju doslovno očuvanje originalnih RGBA uzoraka, razliku alfa nijansi, optimizaciju jednakih uzastopnih boja, pozadinsku masku, male elemente i SVG strukturu. Stvarne razlike prikaza ovise o pregledniku i njegovu SVG rasterizatoru.
+
+U TRUECOLOR MICRO načinu može se zasebno birati lokalna analiza rubova na **1×, 2× ili 3×**. To ne povećava količinu izvornih informacija, već omogućuje gušće uzorkovanje rekonstruirane SVG konture. Strogi TRUECOLOR 1:1 ne mijenja rasterizirane rubove.
