@@ -6,7 +6,9 @@ async function prepare(){
   const im=await image();
   W=im.naturalWidth||im.width;H=im.naturalHeight||im.height;
   const max=10000000;
-  if(W*H>max){const q=Math.sqrt(max/(W*H));W=Math.max(1,Math.round(W*q));H=Math.max(1,Math.round(H*q))}
+  if(W*H>max)throw Error('Original ima '+W+' × '+H+
+    ' piksela (više od 10 MP). Za mikropreciznu vektorizaciju ne smijem ga tiho smanjiti. '+
+    'Učitaj manji original ili podijeli sliku u manje dijelove.');
   const c=document.createElement('canvas');c.width=W;c.height=H;
   const x=c.getContext('2d',{willReadFrequently:true});
   x.drawImage(im,0,0,W,H);imgData=x.getImageData(0,0,W,H);
@@ -41,7 +43,7 @@ async function prepare(){
   return applyMask();
 }
 function applyMask(){const d=new ImageData(new Uint8ClampedArray(imgData.data),W,H),p=d.data;for(let n=0;n<mask.length;n++)p[n*4+3]=mask[n]?255:0;bgCanvas.width=W;bgCanvas.height=H;bgctx.clearRect(0,0,W,H);bgctx.putImageData(d,0,0);cleanPreview.width=W;cleanPreview.height=H;cleanPreview.getContext('2d').putImageData(d,0,0);return d}
-removeBg.onclick=async()=>{removeBg.disabled=true;status.classList.remove('hidden');status.textContent='Analiziram vanjsku pozadinu i čuvam zatvorene detalje loga…';try{await prepare();bgCard.classList.remove('hidden');status.textContent='✓ Pozadina uklonjena.';bgCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri uklanjanju pozadine.'}finally{removeBg.disabled=false}};$('#downloadPng').onclick=()=>bgCanvas.toBlob(b=>{if(!b)return;const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='logo-transparent.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)});
+removeBg.onclick=async()=>{removeBg.disabled=true;status.classList.remove('hidden');status.textContent='Analiziram vanjsku pozadinu i čuvam zatvorene detalje loga…';try{await prepare();bgCard.classList.remove('hidden');status.textContent='✓ Pozadina uklonjena.';bgCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri uklanjanju pozadine: '+e.message}finally{removeBg.disabled=false}};$('#downloadPng').onclick=()=>bgCanvas.toBlob(b=>{if(!b)return;const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='logo-transparent.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)});
 function currentVectorOptions(){
   return {
     maxColors:Number($('#vectorColors').value),
