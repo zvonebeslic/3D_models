@@ -42,8 +42,12 @@ function applyMask(){const d=new ImageData(new Uint8ClampedArray(imgData.data),W
 removeBg.onclick=async()=>{removeBg.disabled=true;status.classList.remove('hidden');status.textContent='Analiziram vanjsku pozadinu i čuvam zatvorene detalje loga…';try{await prepare();bgCard.classList.remove('hidden');status.textContent='✓ Pozadina uklonjena.';bgCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri uklanjanju pozadine.'}finally{removeBg.disabled=false}};$('#downloadPng').onclick=()=>bgCanvas.toBlob(b=>{if(!b)return;const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='logo-transparent.png';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)});
 run.onclick=async()=>{run.disabled=true;status.classList.remove('hidden');status.textContent='Gradim puni SVG iz boja i oblika…';try{if(!imgData||!mask)await prepare();if(typeof window.FullVector!=='function')throw Error('Full vector engine nije učitan');await new Promise(r=>setTimeout(r,40));const b=window.FullVector(mask,imgData,W,H,{
       maxColors:Number($('#vectorColors').value),
-      denoise:Number($('#noiseReduction').value)
-    });svgText=b.svg;svgResult.innerHTML=svgText;stats.textContent=`${b.colors.toLocaleString()} stvarnih boja • ${b.paths.toLocaleString()} kontura • ${b.segments.toLocaleString()} stvarnih SVG segmenata • ${b.points.toLocaleString()} analiziranih rubnih točaka • uklonjeno ${b.noiseRemoved.toLocaleString()} šumnih piksela • SVG s Bézierovim krivuljama`;resultCard.classList.remove('hidden');status.textContent='✓ Full vector SVG gotov.';applyZoom();resultCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri full vektorizaciji: '+e.message}finally{run.disabled=false}};
+      denoise:Number($('#noiseReduction').value),
+      ultraCleanup:$('#ultraCleanup').checked,
+      minIsland:Number($('#minIsland').value),
+      minHole:Number($('#minHole').value),
+      segmentScale:Number($('#segmentScale').value)
+    });svgText=b.svg;svgResult.innerHTML=svgText;stats.textContent=`${b.colors.toLocaleString()} stvarnih boja • ${b.paths.toLocaleString()} kontura • ${b.segments.toLocaleString()} stvarnih SVG segmenata • ${b.points.toLocaleString()} analiziranih rubnih točaka • ${b.microIslandsRemoved} uklonjenih mrlja • ${b.microHolesFilled} zatvorenih rupica • ${b.microNotchesRepaired} popravljenih mikroudubljenja • ${b.refined} segmenata lokalno obrađeno u visokoj rezoluciji • ${b.fallback} velikih segmenata obrađeno 1× • SVG s Bézierovim krivuljama`;resultCard.classList.remove('hidden');status.textContent='✓ Full vector SVG gotov.';applyZoom();resultCard.scrollIntoView({behavior:'smooth'})}catch(e){console.error(e);status.textContent='Greška pri full vektorizaciji: '+e.message}finally{run.disabled=false}};
 function applyZoom(){zoomValue.textContent=zoom.value+'%';const s=svgResult.querySelector('svg');if(s){s.style.width=zoom.value+'%';s.style.height='auto';s.style.maxWidth='none'}}zoom.oninput=applyZoom;function saveFullSVG(){
   if(!svgText){status.classList.remove('hidden');status.textContent='Prvo izradi SVG.';return}
   try{
@@ -71,3 +75,14 @@ $('#shareFullSvg').onclick=async()=>{
 };
 $('#vectorColors').addEventListener('input',()=>$('#vectorColorsLabel').textContent=$('#vectorColors').value);
 $('#noiseReduction').addEventListener('input',()=>$('#noiseReductionLabel').textContent=$('#noiseReduction').value+'%');
+
+function syncCleanupOptions(){
+  const on=$('#ultraCleanup').checked;
+  $('#minIsland').disabled=!on;
+  $('#minHole').disabled=!on;
+  $('#segmentScale').disabled=!on;
+}
+$('#ultraCleanup').addEventListener('change',syncCleanupOptions);
+$('#minIsland').addEventListener('input',()=>$('#minIslandLabel').textContent=$('#minIsland').value+' px²');
+$('#minHole').addEventListener('input',()=>$('#minHoleLabel').textContent=$('#minHole').value+' px²');
+syncCleanupOptions();
