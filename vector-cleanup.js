@@ -135,6 +135,16 @@ function traceComponents(mask,coverage,w,h,opts){
     // The spatial filter is confined to the component's own padded crop,
     // so other letter shapes cannot bleed into one another.
     var smoothed=smoothCoverage(local,cw,ch,opts.edgeSmoothness);
+    // Keep genuine enclosed counters. Without this, Gaussian smoothing could
+    // erase a tiny intentional hole even if the user set its cleanup to 0.
+    if(Number(opts.edgeSmoothness)>0&&opts.preserveHoles!==false){
+      var inverse=new Uint8Array(cw*ch);
+      for(var ii=0;ii<inverse.length;ii++)inverse[ii]=local[ii]?0:1;
+      walk(inverse,cw,ch,4,function(cells,length,bounds){
+        if(bounds.touches)return; // only fully enclosed holes, not the outside
+        for(var j=0;j<length;j++)smoothed[cells[j]]=0;
+      });
+    }
     var field=smoothed,fw=cw,fh=ch;
     if(factor>1){
       fw=cw*factor;fh=ch*factor;
