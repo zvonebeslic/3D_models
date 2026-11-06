@@ -69,3 +69,7 @@
 .retainBackground input{width:18px;height:18px;accent-color:#36cbb6}
 .retainBackground input:disabled{opacity:.45}
 .preserveHint{margin-top:5px!important;color:#a6bdc8!important}
+
+.microScaleControl{display:block;margin-top:16px;color:#c2eef1;font-size:12px;font-weight:700}
+.microScaleControl select{margin-top:8px}
+.microScaleControl select:disabled{opacity:.45}
