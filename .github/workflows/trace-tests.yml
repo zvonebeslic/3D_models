@@ -20,6 +20,7 @@ on:
       - "trace-core.js"
       - "trace-fit.js"
       - "fullvector.js"
+      - "vector-cleanup.js"
       - "vector.js"
       - "index.html"
       - "style.css"
