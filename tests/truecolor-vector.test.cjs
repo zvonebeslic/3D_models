@@ -105,53 +105,44 @@ test("micro mode adds real precision contour clip while retaining full RGBA pale
  assert.equal(r.exactPixels,false);
  assert.ok(!/<image\b/.test(r.svg));
 });
-test("page makes exact truecolor the default and retains legacy curve option",()=>{
+
+test("proven Bezier Full Vector is the primary workflow, exact shade export is separate",()=>{
  const fs=require("node:fs"),path=require("node:path");
  const html=fs.readFileSync(path.join(__dirname,"../index.html"),"utf8");
  const controller=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
- assert.match(html,/id="vectorMode"/);
- assert.match(html,/<option value="exact" selected>/);
- assert.match(html,/<option value="micro">/);
- assert.match(html,/<option value="curves">/);
- assert.match(html,/truecolor-vector\.js\?v=vector15/);
- assert.match(controller,/window\.TrueColorVector\(mask,imgData,W,H/);
- assert.match(controller,/const options=currentVectorOptions\(\)/);
+ assert.doesNotMatch(html,/id="vectorMode"/);
+ assert.match(html,/id="smartShades" checked/);
+ assert.match(html,/id="curveTolerance"/);
+ assert.match(html,/id="exportAllShades"/);
+ assert.match(html,/truecolor-vector\.js\?v=vector16/);
+ assert.match(html,/vector-smart-color\.js\?v=vector16/);
+ assert.match(controller,/window\.FullVector\(mask,imgData,W,H,currentVectorOptions\(\)\)/);
+ assert.match(controller,/window\.TrueColorVector\(originalMask,imgData,W,H/);
+ assert.match(controller,/logo-sve-nijanse-1-na-1\.svg/);
 });
-
-test("autotune considers exact all-color, micro-contour and classic curve alternatives",()=>{
+test("automatic quality tuning changes only parameters of the original curved system",()=>{
  require("../vector-autotune.js");
  const a=globalThis.VectorAutotune.candidateSettings({
-   mode:"exact",maxColors:12,denoise:70,edgeSmoothness:65,
+   maxColors:12,denoise:70,edgeSmoothness:15,
+   smartShades:true,curveTolerance:.25,
    minIsland:6,minHole:14,segmentScale:2,ultraCleanup:true
  });
- assert.ok(a.some(x=>x.settings.mode==="exact"));
- assert.ok(a.some(x=>x.settings.mode==="micro"));
- assert.ok(a.some(x=>x.settings.mode==="curves"));
- assert.ok(a.length>=8);
+ assert.ok(a.length>=5);
+ assert.ok(a.every(x=>x.settings.smartShades===true));
+ assert.ok(a.every(x=>x.settings.mode==null));
+ assert.ok(a.every(x=>x.settings.curveTolerance===.25));
 });
-test("background may be preserved in truecolor without implicit foreground detection",()=>{
+test("big originals cannot be silently downscaled before vectorization",()=>{
  const fs=require("node:fs"),path=require("node:path");
- const html=fs.readFileSync(path.join(__dirname,"../index.html"),"utf8");
- const script=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
- assert.match(html,/id="keepSourceBackground"/);
- assert.match(html,/id="microScale"/);
- assert.match(script,/microScale:options\.microScale/);
- assert.match(script,/mask\.fill\(1\)/);
- assert.match(script,/imgData=null;mask=null;svgText=''/);
+ const js=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
+ assert.match(js,/if\(W\*H>max\)throw Error/);
+ assert.match(js,/ne smijem ga tiho smanjiti/);
 });
-test("truecolor processing refuses silent pixel downscaling",()=>{
- const fs=require("node:fs"),path=require("node:path");
- const script=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
- assert.match(script,/if\(\$\('#vectorMode'\)\.value!=='curves'\)throw Error/);
- assert.match(script,/više od 10 MP/);
-});
-
-test("micro contour scale is configurable independently of original curve controls",()=>{
+test("micro tracing 3x remains available with independent Bezier tolerance",()=>{
  const fs=require("node:fs"),path=require("node:path");
  const html=fs.readFileSync(path.join(__dirname,"../index.html"),"utf8");
  const js=fs.readFileSync(path.join(__dirname,"../vector.js"),"utf8");
- assert.match(html,/<option value="3">3× · dubinska analiza mikrodetalja<\/option>/);
- assert.match(js,/microScale:Number\(\$\('#microScale'\)\.value\)/);
- assert.match(js,/microScale:options\.microScale/);
- assert.match(js,/microScale'\)\.disabled=mode!=='micro'/);
+ assert.match(html,/<option value="3">3× · detaljno \(za manje segmente\)<\/option>/);
+ assert.match(html,/id="curveTolerance"/);
+ assert.match(js,/curveTolerance:Number\(\$\('#curveTolerance'\)\.value\)\/100/);
 });
